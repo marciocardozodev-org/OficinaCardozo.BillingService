@@ -18,9 +18,6 @@ namespace OficinaCardozo.Infrastructure.Factories
             string environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
             Console.WriteLine($"[OficinaDbContextFactory] ENV: {environment}");
 
-            // ...existing code...
-            Console.WriteLine($"[OficinaDbContextFactory] ConnectionString: {connectionString}");
-
             string apiProjectPath = Environment.GetEnvironmentVariable("API_PROJECT_PATH")
                 ?? Path.Combine(Directory.GetCurrentDirectory(), "..", "OficinaCardozo.API");
 
@@ -34,6 +31,7 @@ namespace OficinaCardozo.Infrastructure.Factories
 
             var optionsBuilder = new DbContextOptionsBuilder<OficinaDbContext>();
             var connectionString = configuration.GetConnectionString("DefaultConnection");
+            Console.WriteLine($"[OficinaDbContextFactory] ConnectionString: {connectionString}");
 
             if (string.IsNullOrEmpty(connectionString))
             {

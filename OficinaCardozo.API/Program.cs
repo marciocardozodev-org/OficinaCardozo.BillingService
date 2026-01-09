@@ -160,7 +160,6 @@ try
     }
 
     var key = Encoding.ASCII.GetBytes(jwtKey);
-
     builder.Services.AddAuthentication(x =>
     {
         x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

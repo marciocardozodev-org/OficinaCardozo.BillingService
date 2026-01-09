@@ -37,7 +37,13 @@ namespace OficinaCardozo.Infrastructure.Factories
                 throw new InvalidOperationException("A string de conex�o 'DefaultConnection' n�o foi encontrada.");
             }
 
-            if (environment == "Development")
+            if (connectionString.Contains("Host=") || connectionString.Contains("host="))
+            {
+                Console.WriteLine("[OficinaDbContextFactory] Configurando para PostgreSQL...");
+                optionsBuilder.UseNpgsql(connectionString,
+                    npgsqlOptions => npgsqlOptions.MigrationsAssembly(typeof(OficinaDbContext).Assembly.FullName));
+            }
+            else if (environment == "Development")
             {
                 Console.WriteLine("[OficinaDbContextFactory] Configurando para SQL Server...");
                 var userId = configuration["DatabaseCredentials:UserId"];
@@ -53,12 +59,6 @@ namespace OficinaCardozo.Infrastructure.Factories
 
                 optionsBuilder.UseSqlServer(connectionString,
                     sqlOptions => sqlOptions.MigrationsAssembly(typeof(OficinaDbContext).Assembly.FullName));
-            }
-            else if (connectionString.Contains("Host=") || connectionString.Contains("host="))
-            {
-                Console.WriteLine("[OficinaDbContextFactory] Configurando para PostgreSQL...");
-                optionsBuilder.UseNpgsql(connectionString,
-                    npgsqlOptions => npgsqlOptions.MigrationsAssembly(typeof(OficinaDbContext).Assembly.FullName));
             }
             else
             {

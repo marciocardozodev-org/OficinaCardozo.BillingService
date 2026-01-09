@@ -186,7 +186,7 @@ jobs:
       env:
         KUBE_CONFIG: ${{ secrets.KUBE_CONFIG_HOMOLOG_PROD }}
 
-    - name: Deploy to Kubernetes
+    - name: Apply manifests to Kubernetes
       if: env.DEPLOY_ENABLED == 'true'
       run: |
         SHORT_SHA=${GITHUB_SHA::7}
@@ -197,6 +197,8 @@ jobs:
           NAMESPACE="${K8S_NAMESPACE_HOMOLOG}"
           TAG="homolog-${SHORT_SHA}"
         fi
+
+        kubectl -n "$NAMESPACE" apply -f k8s/
 
         kubectl -n "$NAMESPACE" set image deployment/oficina-cardozo-api \
           api=$DOCKER_IMAGE:$TAG

@@ -84,18 +84,17 @@ jobs:
         aws-region: us-east-1
 
 
-    - name: Baixar kubeconfig do pipeline de infra
-      if: env.DEPLOY_ENABLED == 'true'
-      uses: actions/download-artifact@v4
-      with:
-        name: kubeconfig
-        path: .
 
-    - name: Configurar kubectl com kubeconfig baixado
+    - name: Baixar tfstate do S3
+      if: env.DEPLOY_ENABLED == 'true'
+      run: aws s3 cp s3://oficina-cardozo-terraform-state/eks/prod/terraform.tfstate terraform.tfstate
+
+    - name: Gerar kubeconfig do EKS
       if: env.DEPLOY_ENABLED == 'true'
       run: |
-        mkdir -p $HOME/.kube
-        cp kubeconfig.yaml $HOME/.kube/config
+        export CLUSTER_NAME="oficina-cardozo-eks"
+        export AWS_REGION="us-east-1"
+        aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
 
 
     - name: Apply manifests to Kubernetes

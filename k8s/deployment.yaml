@@ -16,6 +16,11 @@ spec:
     spec:
       containers:
         - name: api
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
           image: marciocardozodev/oficinacardozo-api:latest
           imagePullPolicy: IfNotPresent
           ports:

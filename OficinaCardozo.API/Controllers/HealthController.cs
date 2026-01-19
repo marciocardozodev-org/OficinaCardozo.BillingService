@@ -69,4 +69,28 @@ public class HealthController : ControllerBase
             });
         }
     }
+
+    public class DatadogMetricRequest
+    {
+        public string MetricName { get; set; }
+        public double Value { get; set; }
+        public string Host { get; set; }
+        public string[] Tags { get; set; }
+    }
+
+    [HttpPost("datadog-metric")]
+    public async Task<IActionResult> SendDatadogMetric([FromBody] DatadogMetricRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.MetricName))
+            return BadRequest(new { error = "Invalid metric data" });
+
+        var datadog = new Integrations.DatadogApiClient();
+        await datadog.SendMetricAsync(
+            metricName: request.MetricName,
+            value: request.Value,
+            host: string.IsNullOrWhiteSpace(request.Host) ? Environment.MachineName : request.Host,
+            tags: request.Tags ?? new[] { "env:prod", "service:api", "controller:Health" }
+        );
+        return Ok(new { status = "Metric sent to Datadog" });
+    }
 }

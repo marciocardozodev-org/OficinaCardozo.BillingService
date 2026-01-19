@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-
 using Microsoft.Data.SqlClient;
 using Npgsql.EntityFrameworkCore.PostgreSQL;
 using OficinaCardozo.Application.Interfaces;
@@ -15,9 +14,6 @@ using OficinaCardozo.Infrastructure.Repositories;
 using System.Text;
 using Serilog;
 using Serilog.Formatting.Json;
-using StatsdClient;
-
-
 
 // Configuração do Serilog para logs estruturados em JSON
 Log.Logger = new LoggerConfiguration()
@@ -29,41 +25,12 @@ Log.Information("Iniciando a configuração da API Oficina Cardozo...");
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configuração do DogStatsd para métricas customizadas Datadog
-builder.Services.AddSingleton<IDogStatsd>(sp =>
-{
-    var config = new StatsdConfig
-    {
-        StatsdServerName = Environment.GetEnvironmentVariable("DD_AGENT_HOST") ?? "localhost",
-        StatsdPort = int.TryParse(Environment.GetEnvironmentVariable("DD_DOGSTATSD_PORT"), out var port) ? port : 8125
-    };
-    return new DogStatsd(config);
-});
-
-
 try
 {
     // Substitui o logger padrão pelo Serilog
     builder.Host.UseSerilog();
     // Detecta se está executando no AWS Lambda
     var isLambda = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_LAMBDA_FUNCTION_NAME"));
-
-    var builder = WebApplication.CreateBuilder(args);
-
-    // Configuração do DogStatsd para métricas customizadas Datadog
-    builder.Services.AddSingleton<IDogStatsd>(sp =>
-    {
-        var config = new StatsdConfig
-        {
-            StatsdServerName = Environment.GetEnvironmentVariable("DD_AGENT_HOST") ?? "localhost",
-            StatsdPort = int.TryParse(Environment.GetEnvironmentVariable("DD_DOGSTATSD_PORT"), out var port) ? port : 8125
-        };
-        return new DogStatsd(config);
-    });
-
-    try
-    {
-    }
 
     var connectionStringForLog = builder.Configuration.GetConnectionString("DefaultConnection");
     var jwtKeyForLog = builder.Configuration["ConfiguracoesJwt:ChaveSecreta"];
@@ -280,13 +247,14 @@ try
     Log.Information("🔐 Configurando CORS, Authentication e Authorization...");
     app.UseCors("AllowAll");
     
-    // CRÍTICO: UseRouting deve vir antes de UseAuthentication/UseAuthorization
+
+    // Middleware de latência do Datadog (deve vir após UseRouting e antes dos controllers)
     app.UseRouting();
-    
+    app.UseMiddleware<OficinaCardozo.API.Middleware.DatadogLatencyMiddleware>();
+
     app.UseAuthentication();
     app.UseAuthorization();
-    
-    // MapControllers deve vir DEPOIS de UseRouting
+
     app.MapControllers();
 
     Log.Information("✅ Aplicação configurada e pronta para iniciar.");

@@ -75,12 +75,7 @@ jobs:
       if: env.DEPLOY_ENABLED == 'true'
       run: |
         SHORT_SHA=${GITHUB_SHA::7}
-        if [ "${GITHUB_REF}" = "refs/heads/master" ]; then
-          TAG="${SHORT_SHA}"
-        else
-          TAG="homolog-${SHORT_SHA}"
-        fi
-
+        TAG="manual-$(date +%Y%m%d%H%M%S)"
         docker build -t $DOCKER_IMAGE:$TAG -f Dockerfile .
         docker push $DOCKER_IMAGE:$TAG
 

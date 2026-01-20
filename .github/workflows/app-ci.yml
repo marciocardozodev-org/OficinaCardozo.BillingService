@@ -9,7 +9,7 @@ on:
 
 env:
   DOTNET_VERSION: 8.0.x
-  DOCKER_IMAGE: marciocardozodev/oficinacardozo-api
+  DOCKER_IMAGE: marciocardozodev/oficinacardozo-api-web
 
 jobs:
   build-test-deploy:

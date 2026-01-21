@@ -74,21 +74,10 @@ jobs:
     - name: Build and push Docker image
       if: env.DEPLOY_ENABLED == 'true'
       run: |
-        TAG="manual-$(date +%Y%m%d%H%M%S)"
-        echo "TAG=$TAG" >> $GITHUB_ENV
-        docker build -t $DOCKER_IMAGE:$TAG -f Dockerfile .
-        docker push $DOCKER_IMAGE:$TAG
+        docker build -t $DOCKER_IMAGE:latest -f Dockerfile .
+        docker push $DOCKER_IMAGE:latest
 
-    - name: Atualizar deployment.yaml com nova tag
-      if: env.DEPLOY_ENABLED == 'true'
-      run: |
-        sed -i "s|image: $DOCKER_IMAGE:.*|image: $DOCKER_IMAGE:$TAG|g" k8s/deployment.yaml
-        git config --global user.email "github-actions@github.com"
-        git config --global user.name "github-actions"
-        git add k8s/deployment.yaml
-        git commit -m "ci: update deployment image tag to $TAG" || echo "No changes to commit"
-        git remote set-url origin https://x-access-token:${{ secrets.GIT_PUSH_TOKEN }}@github.com/marciocardozodev-org/OficinaCardozo.App.git
-        git push || echo "No changes to push"
+
 
     - name: Configure AWS credentials for EKS
       if: env.DEPLOY_ENABLED == 'true'
@@ -124,7 +113,7 @@ jobs:
         kubectl -n "$NAMESPACE" apply -f k8s/
 
         kubectl -n "$NAMESPACE" set image deployment/oficina-cardozo-api \
-          api=$DOCKER_IMAGE:$TAG
+          api=$DOCKER_IMAGE:latest
 
         kubectl -n "$NAMESPACE" rollout status deployment/oficina-cardozo-api
       env:

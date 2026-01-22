@@ -28,6 +28,12 @@ spec:
                 secretKeyRef:
                   name: datadog-secret
                   key: api_key
+            # Fallback para compatibilidade futura
+            - name: DATADOG_API_KEY_AGENT
+              valueFrom:
+                secretKeyRef:
+                  name: datadog-agent
+                  key: api-key
             - name: DATADOG_SITE
               value: us5.datadoghq.com
           image: marciocardozodev/oficinacardozo-api-web:latest

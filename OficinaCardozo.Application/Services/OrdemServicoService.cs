@@ -79,110 +79,118 @@ public class OrdemServicoService : IOrdemServicoService
 
     public async Task<OrdemServicoDto> CreateOrdemServicoComOrcamentoAsync(CreateOrdemServicoDto createDto)
     {
-        var cliente = await _clienteRepository.GetByCpfCnpjAsync(createDto.ClienteCpfCnpj);
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        if (cliente == null)
-            throw new KeyNotFoundException($"Cliente com CPF/CNPJ {createDto.ClienteCpfCnpj} não encontrado");
-
-        var veiculo = await _veiculoRepository.GetByPlacaAsync(createDto.VeiculoPlaca);
-        if (veiculo == null)
+        try
         {
-            veiculo = new Veiculo
+            var cliente = await _clienteRepository.GetByCpfCnpjAsync(createDto.ClienteCpfCnpj);
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            if (cliente == null)
+                throw new KeyNotFoundException($"Cliente com CPF/CNPJ {createDto.ClienteCpfCnpj} não encontrado");
+
+            var veiculo = await _veiculoRepository.GetByPlacaAsync(createDto.VeiculoPlaca);
+            if (veiculo == null)
             {
-                IdCliente = cliente.Id,
-                Placa = createDto.VeiculoPlaca,
-                MarcaModelo = createDto.VeiculoMarcaModelo,
-                AnoFabricacao = createDto.VeiculoAnoFabricacao,
-                Cor = createDto.VeiculoCor,
-                TipoCombustivel = createDto.VeiculoTipoCombustivel ?? "não informado"
-            };
-            veiculo = await _veiculoRepository.CreateAsync(veiculo);
-        }
-        else if (veiculo.IdCliente != cliente.Id)
-        {
-            throw new InvalidOperationException("Veículo pertence a outro cliente");
-        }
-        var servicos = new List<Servico>();
-        foreach (var servicoId in createDto.ServicosIds)
-        {
-            var servico = await _servicoRepository.GetByIdAsync(servicoId);
-            if (servico == null)
-                throw new KeyNotFoundException($"Serviço com ID {servicoId} não encontrado");
-            servicos.Add(servico);
-        }
-
-        var pecas = new List<Peca>();
-        if (createDto.Pecas?.Any() == true)
-        {
-            foreach (var pecaDto in createDto.Pecas)
-            {
-                var peca = await _pecaRepository.GetByIdAsync(pecaDto.IdPeca);
-                if (peca == null)
-                    throw new KeyNotFoundException($"Peças com ID {pecaDto.IdPeca} não encontrada");
-
-                if (peca.QuantidadeEstoque < pecaDto.Quantidade)
-                    throw new InvalidOperationException($"Estoque insuficiente para a Peças {peca.NomePeca}. Disponível: {peca.QuantidadeEstoque}, Solicitado: {pecaDto.Quantidade}");
-
-                pecas.Add(peca);
+                veiculo = new Veiculo
+                {
+                    IdCliente = cliente.Id,
+                    Placa = createDto.VeiculoPlaca,
+                    MarcaModelo = createDto.VeiculoMarcaModelo,
+                    AnoFabricacao = createDto.VeiculoAnoFabricacao,
+                    Cor = createDto.VeiculoCor ?? "não informado",
+                    TipoCombustivel = createDto.VeiculoTipoCombustivel ?? "não informado"
+                };
+                veiculo = await _veiculoRepository.CreateAsync(veiculo);
             }
-        }
-
-        var statusRecebida = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.RECEBIDA);
-        if (statusRecebida == null)
-            throw new InvalidOperationException("Status 'Recebida' não encontrado");
-
-        var ordemServico = new OrdemServico
-        {
-            DataSolicitacao = DateTime.Now,
-            IdVeiculo = veiculo.Id,
-            IdStatus = statusRecebida.Id
-        };
-
-        var createdOrdemServico = await _ordemServicoRepository.CreateAsync(ordemServico);
-
-        for (int i = 0; i < createDto.ServicosIds.Count; i++)
-        {
-            var servicoId = createDto.ServicosIds[i];
-            var servico = servicos[i];
-
-            var ordemServicoServico = new OrdemServicoServico
+            else if (veiculo.IdCliente != cliente.Id)
             {
-                IdOrdemServico = createdOrdemServico.Id,
-                IdServico = servicoId,
-                ValorAplicado = servico.Preco
+                throw new InvalidOperationException("Veículo pertence a outro cliente");
+            }
+            var servicos = new List<Servico>();
+            foreach (var servicoId in createDto.ServicosIds)
+            {
+                var servico = await _servicoRepository.GetByIdAsync(servicoId);
+                if (servico == null)
+                    throw new KeyNotFoundException($"Serviço com ID {servicoId} não encontrado");
+                servicos.Add(servico);
+            }
+
+            var pecas = new List<Peca>();
+            if (createDto.Pecas?.Any() == true)
+            {
+                foreach (var pecaDto in createDto.Pecas)
+                {
+                    var peca = await _pecaRepository.GetByIdAsync(pecaDto.IdPeca);
+                    if (peca == null)
+                        throw new KeyNotFoundException($"Peças com ID {pecaDto.IdPeca} não encontrada");
+
+                    if (peca.QuantidadeEstoque < pecaDto.Quantidade)
+                        throw new InvalidOperationException($"Estoque insuficiente para a Peças {peca.NomePeca}. Disponível: {peca.QuantidadeEstoque}, Solicitado: {pecaDto.Quantidade}");
+
+                    pecas.Add(peca);
+                }
+            }
+
+            var statusRecebida = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.RECEBIDA);
+            if (statusRecebida == null)
+                throw new InvalidOperationException("Status 'Recebida' não encontrado");
+
+            var ordemServico = new OrdemServico
+            {
+                DataSolicitacao = DateTime.Now,
+                IdVeiculo = veiculo.Id,
+                IdStatus = statusRecebida.Id
             };
 
-            await _ordemServicoRepository.AddOrdemServicoServicoAsync(ordemServicoServico);
-        }
+            var createdOrdemServico = await _ordemServicoRepository.CreateAsync(ordemServico);
 
-        if (createDto.Pecas?.Any() == true)
-        {
-            for (int i = 0; i < createDto.Pecas.Count; i++)
+            for (int i = 0; i < createDto.ServicosIds.Count; i++)
             {
-                var pecaDto = createDto.Pecas[i];
-                var peca = pecas[i];
+                var servicoId = createDto.ServicosIds[i];
+                var servico = servicos[i];
 
-                var ordemServicoPeca = new OrdemServicoPeca
+                var ordemServicoServico = new OrdemServicoServico
                 {
                     IdOrdemServico = createdOrdemServico.Id,
-                    IdPeca = pecaDto.IdPeca,
-                    Quantidade = pecaDto.Quantidade,
-                    ValorUnitario = peca.Preco
+                    IdServico = servicoId,
+                    ValorAplicado = servico.Preco
                 };
 
-                await _ordemServicoRepository.AddOrdemServicoPecaAsync(ordemServicoPeca);
+                await _ordemServicoRepository.AddOrdemServicoServicoAsync(ordemServicoServico);
             }
+
+            if (createDto.Pecas?.Any() == true)
+            {
+                for (int i = 0; i < createDto.Pecas.Count; i++)
+                {
+                    var pecaDto = createDto.Pecas[i];
+                    var peca = pecas[i];
+
+                    var ordemServicoPeca = new OrdemServicoPeca
+                    {
+                        IdOrdemServico = createdOrdemServico.Id,
+                        IdPeca = pecaDto.IdPeca,
+                        Quantidade = pecaDto.Quantidade,
+                        ValorUnitario = peca.Preco
+                    };
+
+                    await _ordemServicoRepository.AddOrdemServicoPecaAsync(ordemServicoPeca);
+                }
+            }
+
+            var result = await GetByIdAsync(createdOrdemServico.Id)
+                ?? throw new InvalidOperationException("Erro ao recuperar ordem de Serviço criada com sucesso.");
+
+            stopwatch.Stop();
+            // Métricas customizadas Datadog
+            StatsdClient.Metrics.Counter("oficinacardozo.ordem_servico.criada", 1);
+            StatsdClient.Metrics.Timer("oficinacardozo.ordem_servico.tempo_criacao_ms", (int)stopwatch.ElapsedMilliseconds);
+
+            return result;
         }
-
-         var result = await GetByIdAsync(createdOrdemServico.Id)
-             ?? throw new InvalidOperationException("Erro ao recuperar ordem de Serviço criada com sucesso.");
-
-         stopwatch.Stop();
-         // Métricas customizadas Datadog
-         StatsdClient.Metrics.Counter("oficinacardozo.ordem_servico.criada", 1);
-         StatsdClient.Metrics.Timer("oficinacardozo.ordem_servico.tempo_criacao_ms", (int)stopwatch.ElapsedMilliseconds);
-
-         return result;
+        catch (Exception)
+        {
+            StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
+            throw;
+        }
     }
 
     public async Task<IEnumerable<OrdemServicoDto>> GetAllAtivasAsync()
@@ -219,231 +227,253 @@ public class OrdemServicoService : IOrdemServicoService
 
     public async Task<OrcamentoResumoDto> IniciarDiagnosticoAsync(int ordemServicoId)
     {
-        
-        var ordemServicoDetails = await _ordemServicoRepository.GetByIdWithDetailsAsync(ordemServicoId);
-        if (ordemServicoDetails == null)
-            throw new KeyNotFoundException("Ordem de serviço não encontrada");
-
-        
-        var statusRecebida = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.RECEBIDA);
-        if (statusRecebida == null)
-            throw new InvalidOperationException("Status 'Recebida' não encontrado");
-
-        if (ordemServicoDetails.IdStatus != statusRecebida.Id)
-            throw new InvalidOperationException($"Ordem de serviço deve estar no status 'Recebida' para iniciar diagnóstico. Status atual: {ordemServicoDetails.Status?.Descricao}");
-
-        
-        var statusEmDiagnostico = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.EM_DIAGNOSTICO);
-        if (statusEmDiagnostico == null)
-            throw new InvalidOperationException("Status 'Em diagnostico' não encontrado");
-
-        
-        var ordemServicoParaUpdate = await _ordemServicoRepository.GetByIdAsync(ordemServicoId);
-        if (ordemServicoParaUpdate == null)
-            throw new KeyNotFoundException("Ordem de serviço não encontrada para atualização");
-
-       
-        ordemServicoParaUpdate.IdStatus = statusEmDiagnostico.Id;
-        await _ordemServicoRepository.UpdateAsync(ordemServicoParaUpdate);
-
-        
-        var orcamento = await GerarOrcamentoAsync(ordemServicoId);
-
-        return new OrcamentoResumoDto
+        try
         {
-            Id = orcamento.Id,
-            DataOrcamento = orcamento.DataOrcamento,
-            StatusDescricao = "Diagnostico iniciado",
-            ClienteNome = ordemServicoDetails.Veiculo?.Cliente?.Nome ?? "",
-            ClienteEmail = ordemServicoDetails.Veiculo?.Cliente?.EmailPrincipal ?? "",
-            VeiculoPlaca = ordemServicoDetails.Veiculo?.Placa ?? "",
-            VeiculoMarcaModelo = ordemServicoDetails.Veiculo?.MarcaModelo ?? "",
-            ValorTotal = 0,
-            MensagemAprovacao = "Diagnostico iniciado. Orçamento Em elaboracao."
-        };
+            var ordemServicoDetails = await _ordemServicoRepository.GetByIdWithDetailsAsync(ordemServicoId);
+            if (ordemServicoDetails == null)
+                throw new KeyNotFoundException("Ordem de serviço não encontrada");
+
+            var statusRecebida = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.RECEBIDA);
+            if (statusRecebida == null)
+                throw new InvalidOperationException("Status 'Recebida' não encontrado");
+
+            if (ordemServicoDetails.IdStatus != statusRecebida.Id)
+                throw new InvalidOperationException($"Ordem de serviço deve estar no status 'Recebida' para iniciar diagnóstico. Status atual: {ordemServicoDetails.Status?.Descricao}");
+
+            var statusEmDiagnostico = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.EM_DIAGNOSTICO);
+            if (statusEmDiagnostico == null)
+                throw new InvalidOperationException("Status 'Em diagnostico' não encontrado");
+
+            var ordemServicoParaUpdate = await _ordemServicoRepository.GetByIdAsync(ordemServicoId);
+            if (ordemServicoParaUpdate == null)
+                throw new KeyNotFoundException("Ordem de serviço não encontrada para atualização");
+
+            ordemServicoParaUpdate.IdStatus = statusEmDiagnostico.Id;
+            await _ordemServicoRepository.UpdateAsync(ordemServicoParaUpdate);
+
+            var orcamento = await GerarOrcamentoAsync(ordemServicoId);
+
+            return new OrcamentoResumoDto
+            {
+                Id = orcamento.Id,
+                DataOrcamento = orcamento.DataOrcamento,
+                StatusDescricao = "Diagnostico iniciado",
+                ClienteNome = ordemServicoDetails.Veiculo?.Cliente?.Nome ?? "",
+                ClienteEmail = ordemServicoDetails.Veiculo?.Cliente?.EmailPrincipal ?? "",
+                VeiculoPlaca = ordemServicoDetails.Veiculo?.Placa ?? "",
+                VeiculoMarcaModelo = ordemServicoDetails.Veiculo?.MarcaModelo ?? "",
+                ValorTotal = 0,
+                MensagemAprovacao = "Diagnostico iniciado. Orçamento Em elaboracao."
+            };
+        }
+        catch (Exception)
+        {
+            StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
+            throw;
+        }
     }
 
     public async Task<OrcamentoResumoDto> FinalizarDiagnosticoAsync(int ordemServicoId)
     {
-      
-        var ordemServicoDetails = await _ordemServicoRepository.GetByIdWithDetailsAsync(ordemServicoId);
-        if (ordemServicoDetails == null)
-            throw new KeyNotFoundException("Ordem de serviço não encontrada");
-
- 
-        var statusEmDiagnostico = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.EM_DIAGNOSTICO);
-        if (statusEmDiagnostico == null)
-            throw new InvalidOperationException("Status 'Em diagnostico' não encontrado");
-
-        if (ordemServicoDetails.IdStatus != statusEmDiagnostico.Id)
-            throw new InvalidOperationException($"Ordem de serviço deve estar 'Em diagnostico' para finalizar. Status atual: {ordemServicoDetails.Status?.Descricao}");
-
-        
-        var orcamento = ordemServicoDetails.Orcamentos?.FirstOrDefault();
-        if (orcamento == null)
-            throw new InvalidOperationException("Nenhum orçamento encontrado para esta ordem de serviço");
-
-        
-        var statusOrcamentoCriado = await _orcamentoStatusRepository.GetByDescricaoAsync(OrcamentoStatusConstants.CRIADO);
-        if (orcamento.IdStatus != statusOrcamentoCriado?.Id)
-            throw new InvalidOperationException("Orçamento deve estar no status 'Criado' para finalizar diagnóstico");
-
-       
-        var statusEmElaboracao = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.EM_ELABORACAO);
-        if (statusEmElaboracao == null)
-            throw new InvalidOperationException("Status 'Em elaboracao' para ordem de serviço não encontrado");
-
-        var ordemServicoParaUpdate = await _ordemServicoRepository.GetByIdAsync(ordemServicoId);
-        if (ordemServicoParaUpdate == null)
-            throw new KeyNotFoundException("Ordem de serviço não encontrada para atualização");
-
-        ordemServicoParaUpdate.IdStatus = statusEmElaboracao.Id;
-        await _ordemServicoRepository.UpdateAsync(ordemServicoParaUpdate);
-
-        var statusOrcamentoEmElaboracao = await _orcamentoStatusRepository.GetByDescricaoAsync(OrcamentoStatusConstants.EM_ELABORACAO);
-        if (statusOrcamentoEmElaboracao != null)
+        try
         {
-            orcamento.IdStatus = statusOrcamentoEmElaboracao.Id;
-            await _orcamentoRepository.UpdateAsync(orcamento);
+            var ordemServicoDetails = await _ordemServicoRepository.GetByIdWithDetailsAsync(ordemServicoId);
+            if (ordemServicoDetails == null)
+                throw new KeyNotFoundException("Ordem de serviço não encontrada");
+
+            var statusEmDiagnostico = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.EM_DIAGNOSTICO);
+            if (statusEmDiagnostico == null)
+                throw new InvalidOperationException("Status 'Em diagnostico' não encontrado");
+
+            if (ordemServicoDetails.IdStatus != statusEmDiagnostico.Id)
+                throw new InvalidOperationException($"Ordem de serviço deve estar 'Em diagnostico' para finalizar. Status atual: {ordemServicoDetails.Status?.Descricao}");
+
+            var orcamento = ordemServicoDetails.Orcamentos?.FirstOrDefault();
+            if (orcamento == null)
+                throw new InvalidOperationException("Nenhum orçamento encontrado para esta ordem de serviço");
+
+            var statusOrcamentoCriado = await _orcamentoStatusRepository.GetByDescricaoAsync(OrcamentoStatusConstants.CRIADO);
+            if (orcamento.IdStatus != statusOrcamentoCriado?.Id)
+                throw new InvalidOperationException("Orçamento deve estar no status 'Criado' para finalizar diagnóstico");
+
+            var statusEmElaboracao = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.EM_ELABORACAO);
+            if (statusEmElaboracao == null)
+                throw new InvalidOperationException("Status 'Em elaboracao' para ordem de serviço não encontrado");
+
+            var ordemServicoParaUpdate = await _ordemServicoRepository.GetByIdAsync(ordemServicoId);
+            if (ordemServicoParaUpdate == null)
+                throw new KeyNotFoundException("Ordem de serviço não encontrada para atualização");
+
+            ordemServicoParaUpdate.IdStatus = statusEmElaboracao.Id;
+            await _ordemServicoRepository.UpdateAsync(ordemServicoParaUpdate);
+
+            var statusOrcamentoEmElaboracao = await _orcamentoStatusRepository.GetByDescricaoAsync(OrcamentoStatusConstants.EM_ELABORACAO);
+            if (statusOrcamentoEmElaboracao != null)
+            {
+                orcamento.IdStatus = statusOrcamentoEmElaboracao.Id;
+                await _orcamentoRepository.UpdateAsync(orcamento);
+            }
+
+            return new OrcamentoResumoDto
+            {
+                Id = orcamento.Id,
+                DataOrcamento = orcamento.DataOrcamento,
+                StatusDescricao = "Orçamento Em elaboracao - Pronto para envio",
+                ClienteNome = ordemServicoDetails.Veiculo?.Cliente?.Nome ?? "",
+                ClienteEmail = ordemServicoDetails.Veiculo?.Cliente?.EmailPrincipal ?? "",
+                VeiculoPlaca = ordemServicoDetails.Veiculo?.Placa ?? "",
+                VeiculoMarcaModelo = ordemServicoDetails.Veiculo?.MarcaModelo ?? "",
+                ValorTotal = CalcularValorTotalOrcamento(orcamento),
+                MensagemAprovacao = "Diagnóstico finalizado! Orçamento elaborado e pronto para ser enviado ao cliente."
+            };
         }
-
-        return new OrcamentoResumoDto
+        catch (Exception)
         {
-            Id = orcamento.Id,
-            DataOrcamento = orcamento.DataOrcamento,
-            StatusDescricao = "Orçamento Em elaboracao - Pronto para envio",
-            ClienteNome = ordemServicoDetails.Veiculo?.Cliente?.Nome ?? "",
-            ClienteEmail = ordemServicoDetails.Veiculo?.Cliente?.EmailPrincipal ?? "",
-            VeiculoPlaca = ordemServicoDetails.Veiculo?.Placa ?? "",
-            VeiculoMarcaModelo = ordemServicoDetails.Veiculo?.MarcaModelo ?? "",
-            ValorTotal = CalcularValorTotalOrcamento(orcamento),
-            MensagemAprovacao = "Diagnóstico finalizado! Orçamento elaborado e pronto para ser enviado ao cliente."
-        };
+            StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
+            throw;
+        }
     }
+
     public async Task<OrcamentoResumoDto> EnviarOrcamentoParaAprovacaoAsync(EnviarOrcamentoParaAprovacaoDto enviarDto)
     {
-        var orcamento = await _orcamentoRepository.GetByIdWithDetailsAsync(enviarDto.IdOrcamento);
-        if (orcamento == null)
-            throw new KeyNotFoundException("Orçamento não encontrado");
-
-        var statusOrcamentoValidos = new[] {
-            OrcamentoStatusConstants.CRIADO,
-            OrcamentoStatusConstants.EM_ELABORACAO
-        };
-
-        var statusOrcamentoAtual = orcamento.Status?.Descricao;
-        if (!statusOrcamentoValidos.Contains(statusOrcamentoAtual))
-            throw new InvalidOperationException($"Orçamento deve estar 'Criado' ou 'Em elaboracao' para envio. Status atual: '{statusOrcamentoAtual}'");
-
-        var statusEmElaboracao = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.EM_ELABORACAO);
-        if (orcamento.OrdemServico?.IdStatus != statusEmElaboracao?.Id)
-            throw new InvalidOperationException("Ordem de serviço deve estar 'Em elaboracao' para envio");
-
-       var statusAguardandoAprovacao = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.AGUARDANDO_APROVACAO);
-        if (statusAguardandoAprovacao == null)
-            throw new InvalidOperationException("Status 'Aguardando aprovaçao' não encontrado");
-
-        var ordemServico = await _ordemServicoRepository.GetByIdAsync(orcamento.IdOrdemServico);
-        if (ordemServico != null)
+        try
         {
-            ordemServico.IdStatus = statusAguardandoAprovacao.Id;
-            await _ordemServicoRepository.UpdateAsync(ordemServico);
+            var orcamento = await _orcamentoRepository.GetByIdWithDetailsAsync(enviarDto.IdOrcamento);
+            if (orcamento == null)
+                throw new KeyNotFoundException("Orçamento não encontrado");
+
+            var statusOrcamentoValidos = new[] {
+                OrcamentoStatusConstants.CRIADO,
+                OrcamentoStatusConstants.EM_ELABORACAO
+            };
+
+            var statusOrcamentoAtual = orcamento.Status?.Descricao;
+            if (!statusOrcamentoValidos.Contains(statusOrcamentoAtual))
+                throw new InvalidOperationException($"Orçamento deve estar 'Criado' ou 'Em elaboracao' para envio. Status atual: '{statusOrcamentoAtual}'");
+
+            var statusEmElaboracao = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.EM_ELABORACAO);
+            if (orcamento.OrdemServico?.IdStatus != statusEmElaboracao?.Id)
+                throw new InvalidOperationException("Ordem de serviço deve estar 'Em elaboracao' para envio");
+
+            var statusAguardandoAprovacao = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.AGUARDANDO_APROVACAO);
+            if (statusAguardandoAprovacao == null)
+                throw new InvalidOperationException("Status 'Aguardando aprovaçao' não encontrado");
+
+            var ordemServico = await _ordemServicoRepository.GetByIdAsync(orcamento.IdOrdemServico);
+            if (ordemServico != null)
+            {
+                ordemServico.IdStatus = statusAguardandoAprovacao.Id;
+                await _ordemServicoRepository.UpdateAsync(ordemServico);
+            }
+
+            var statusOrcamentoPendente = await _orcamentoStatusRepository.GetByDescricaoAsync(OrcamentoStatusConstants.PENDENTE_APROVACAO);
+            if (statusOrcamentoPendente == null)
+                throw new InvalidOperationException("Status 'Pendente aprovacao' para orçamento não encontrado");
+
+            orcamento.IdStatus = statusOrcamentoPendente.Id;
+            await _orcamentoRepository.UpdateAsync(orcamento);
+
+            return new OrcamentoResumoDto
+            {
+                Id = orcamento.Id,
+                DataOrcamento = orcamento.DataOrcamento,
+                StatusDescricao = OrcamentoStatusConstants.PENDENTE_APROVACAO,
+                ClienteNome = orcamento.OrdemServico?.Veiculo?.Cliente?.Nome ?? "",
+                ClienteEmail = orcamento.OrdemServico?.Veiculo?.Cliente?.EmailPrincipal ?? "",
+                VeiculoPlaca = orcamento.OrdemServico?.Veiculo?.Placa ?? "",
+                VeiculoMarcaModelo = orcamento.OrdemServico?.Veiculo?.MarcaModelo ?? "",
+                ValorTotal = CalcularValorTotalOrcamento(orcamento),
+                MensagemAprovacao = $"Orçamento enviado para aprovação do cliente. {enviarDto.Observacoes ?? ""}"
+            };
         }
-
-        var statusOrcamentoPendente = await _orcamentoStatusRepository.GetByDescricaoAsync(OrcamentoStatusConstants.PENDENTE_APROVACAO);
-        if (statusOrcamentoPendente == null)
-            throw new InvalidOperationException("Status 'Pendente aprovacao' para orçamento não encontrado");
-
-        orcamento.IdStatus = statusOrcamentoPendente.Id;
-        await _orcamentoRepository.UpdateAsync(orcamento);
-
-        return new OrcamentoResumoDto
+        catch (Exception)
         {
-            Id = orcamento.Id,
-            DataOrcamento = orcamento.DataOrcamento,
-            StatusDescricao = OrcamentoStatusConstants.PENDENTE_APROVACAO,
-            ClienteNome = orcamento.OrdemServico?.Veiculo?.Cliente?.Nome ?? "",
-            ClienteEmail = orcamento.OrdemServico?.Veiculo?.Cliente?.EmailPrincipal ?? "",
-            VeiculoPlaca = orcamento.OrdemServico?.Veiculo?.Placa ?? "",
-            VeiculoMarcaModelo = orcamento.OrdemServico?.Veiculo?.MarcaModelo ?? "",
-            ValorTotal = CalcularValorTotalOrcamento(orcamento),
-            MensagemAprovacao = $"Orçamento enviado para aprovação do cliente. {enviarDto.Observacoes ?? ""}"
-        };
+            StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
+            throw;
+        }
     }
 
     public async Task<OrcamentoResumoDto> AprovarOrcamentoAsync(AprovarOrcamentoDto aprovarDto)
     {
-        var orcamento = await _orcamentoRepository.GetByIdWithDetailsAsync(aprovarDto.IdOrcamento);
-        if (orcamento == null)
-            throw new KeyNotFoundException("Orçamento não encontrado");
-
-        var statusOrcamentoAtual = orcamento.Status?.Descricao;
-
-        if (statusOrcamentoAtual != OrcamentoStatusConstants.PENDENTE_APROVACAO)
-            throw new InvalidOperationException($"Orçamento não pode ser processado. Status atual: '{statusOrcamentoAtual}'. Apenas orçamentos 'Pendente aprovacao' podem ser aprovados/rejeitados.");
-
-        var statusAguardandoAprovacao = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.AGUARDANDO_APROVACAO);
-        if (orcamento.OrdemServico?.IdStatus != statusAguardandoAprovacao?.Id)
-            throw new InvalidOperationException("Ordem de serviço deve estar 'Aguardando aprovacao' para processar resposta do cliente");
-
-        string statusOrdemServicoDescricao;
-        string statusOrcamentoDescricao;
-        string mensagemFinal;
-        Orcamento? novoOrcamento = null;
-
-        if (aprovarDto.Aprovado)
+        try
         {
-            statusOrdemServicoDescricao = OrdemServicoStatusConstants.EM_EXECUCAO;
-            statusOrcamentoDescricao = OrcamentoStatusConstants.APROVADO;
-            mensagemFinal = "Orçamento aprovado! Serviço iniciado automaticamente.";
-        }
-        else
-        {
-            if (aprovarDto.SolicitarNovoOrcamento)
+            var orcamento = await _orcamentoRepository.GetByIdWithDetailsAsync(aprovarDto.IdOrcamento);
+            if (orcamento == null)
+                throw new KeyNotFoundException("Orçamento não encontrado");
+
+            var statusOrcamentoAtual = orcamento.Status?.Descricao;
+
+            if (statusOrcamentoAtual != OrcamentoStatusConstants.PENDENTE_APROVACAO)
+                throw new InvalidOperationException($"Orçamento não pode ser processado. Status atual: '{statusOrcamentoAtual}'. Apenas orçamentos 'Pendente aprovacao' podem ser aprovados/rejeitados.");
+
+            var statusAguardandoAprovacao = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.AGUARDANDO_APROVACAO);
+            if (orcamento.OrdemServico?.IdStatus != statusAguardandoAprovacao?.Id)
+                throw new InvalidOperationException("Ordem de serviço deve estar 'Aguardando aprovacao' para processar resposta do cliente");
+
+            string statusOrdemServicoDescricao;
+            string statusOrcamentoDescricao;
+            string mensagemFinal;
+            Orcamento? novoOrcamento = null;
+
+            if (aprovarDto.Aprovado)
             {
-                statusOrdemServicoDescricao = OrdemServicoStatusConstants.EM_ELABORACAO;
-                statusOrcamentoDescricao = OrcamentoStatusConstants.REJEITADO;
-
-                novoOrcamento = await GerarOrcamentoAsync(orcamento.IdOrdemServico);
-
-                mensagemFinal = $"Orçamento rejeitado. Novo orçamento criado (ID: {novoOrcamento.Id}) - oficina irá elaborar nova proposta.";
+                statusOrdemServicoDescricao = OrdemServicoStatusConstants.EM_EXECUCAO;
+                statusOrcamentoDescricao = OrcamentoStatusConstants.APROVADO;
+                mensagemFinal = "Orçamento aprovado! Serviço iniciado automaticamente.";
             }
             else
             {
-                if (aprovarDto.VeiculoJaRetirado)
+                if (aprovarDto.SolicitarNovoOrcamento)
                 {
-                    statusOrdemServicoDescricao = OrdemServicoStatusConstants.DEVOLVIDA;
-                    mensagemFinal = "Orçamento rejeitado e veículo já foi devolvido. Ordem finalizada.";
+                    statusOrdemServicoDescricao = OrdemServicoStatusConstants.EM_ELABORACAO;
+                    statusOrcamentoDescricao = OrcamentoStatusConstants.REJEITADO;
+
+                    novoOrcamento = await GerarOrcamentoAsync(orcamento.IdOrdemServico);
+
+                    mensagemFinal = $"Orçamento rejeitado. Novo orçamento criado (ID: {novoOrcamento.Id}) - oficina irá elaborar nova proposta.";
                 }
                 else
                 {
-                    statusOrdemServicoDescricao = OrdemServicoStatusConstants.CANCELADA;
-                    mensagemFinal = "Orçamento rejeitado e serviço cancelado. Aguardando retirada do veículo.";
+                    if (aprovarDto.VeiculoJaRetirado)
+                    {
+                        statusOrdemServicoDescricao = OrdemServicoStatusConstants.DEVOLVIDA;
+                        mensagemFinal = "Orçamento rejeitado e veículo já foi devolvido. Ordem finalizada.";
+                    }
+                    else
+                    {
+                        statusOrdemServicoDescricao = OrdemServicoStatusConstants.CANCELADA;
+                        mensagemFinal = "Orçamento rejeitado e serviço cancelado. Aguardando retirada do veículo.";
+                    }
+                    statusOrcamentoDescricao = OrcamentoStatusConstants.REJEITADO;
                 }
-                statusOrcamentoDescricao = OrcamentoStatusConstants.REJEITADO;
             }
+
+            await AtualizarStatusOrdemServicoAsync(orcamento.IdOrdemServico, statusOrdemServicoDescricao);
+            await AtualizarStatusOrcamentoAsync(orcamento, statusOrcamentoDescricao);
+
+            var mensagemCompleta = ConstruirMensagemCompleta(mensagemFinal, aprovarDto);
+
+            var orcamentoParaResposta = novoOrcamento ?? orcamento;
+            var statusParaResposta = novoOrcamento != null ? "Criado" : statusOrcamentoDescricao;
+
+            return new OrcamentoResumoDto
+            {
+                Id = orcamentoParaResposta.Id,
+                DataOrcamento = orcamentoParaResposta.DataOrcamento,
+                StatusDescricao = statusParaResposta,
+                ClienteNome = orcamento.OrdemServico?.Veiculo?.Cliente?.Nome ?? "",
+                ClienteEmail = orcamento.OrdemServico?.Veiculo?.Cliente?.EmailPrincipal ?? "",
+                VeiculoPlaca = orcamento.OrdemServico?.Veiculo?.Placa ?? "",
+                VeiculoMarcaModelo = orcamento.OrdemServico?.Veiculo?.MarcaModelo ?? "",
+                ValorTotal = CalcularValorTotalOrcamento(orcamento),
+                MensagemAprovacao = mensagemCompleta
+            };
         }
-
-        await AtualizarStatusOrdemServicoAsync(orcamento.IdOrdemServico, statusOrdemServicoDescricao);
-        await AtualizarStatusOrcamentoAsync(orcamento, statusOrcamentoDescricao);
-
-        var mensagemCompleta = ConstruirMensagemCompleta(mensagemFinal, aprovarDto);
-
-        var orcamentoParaResposta = novoOrcamento ?? orcamento;
-        var statusParaResposta = novoOrcamento != null ? "Criado" : statusOrcamentoDescricao;
-
-        return new OrcamentoResumoDto
+        catch (Exception)
         {
-            Id = orcamentoParaResposta.Id,
-            DataOrcamento = orcamentoParaResposta.DataOrcamento,
-            StatusDescricao = statusParaResposta,
-            ClienteNome = orcamento.OrdemServico?.Veiculo?.Cliente?.Nome ?? "",
-            ClienteEmail = orcamento.OrdemServico?.Veiculo?.Cliente?.EmailPrincipal ?? "",
-            VeiculoPlaca = orcamento.OrdemServico?.Veiculo?.Placa ?? "",
-            VeiculoMarcaModelo = orcamento.OrdemServico?.Veiculo?.MarcaModelo ?? "",
-            ValorTotal = CalcularValorTotalOrcamento(orcamento),
-            MensagemAprovacao = mensagemCompleta
-        };
+            StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
+            throw;
+        }
     }
 
     private async Task AtualizarStatusOrdemServicoAsync(int idOrdemServico, string statusDescricao)

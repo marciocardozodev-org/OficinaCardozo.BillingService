@@ -28,42 +28,48 @@ public class OrdemServicoStatusService : IOrdemServicoStatusService
 
     public async Task<OrdemServicoDto> AtualizarStatusViaEmailAsync(ComandoEmailDto comando)
     {
-        _logger.LogInformation("?? Iniciando atualização de status via email para OS #{OrdemId}", comando.OrdemServicoId);
+        _logger.LogInformation("?? Iniciando atualizaï¿½ï¿½o de status via email para OS #{OrdemId}", comando.OrdemServicoId);
 
-        var ordem = await _ordemServicoRepository.GetByIdWithDetailsAsync(comando.OrdemServicoId);
-        if (ordem == null)
+        try
         {
-            throw new KeyNotFoundException($"Ordem de serviço #{comando.OrdemServicoId} não encontrada");
-        }
+            var ordem = await _ordemServicoRepository.GetByIdWithDetailsAsync(comando.OrdemServicoId);
+            if (ordem == null)
+            {
+                StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
+                throw new KeyNotFoundException($"Ordem de serviï¿½o #{comando.OrdemServicoId} nï¿½o encontrada");
+            }
 
-        var novoStatus = await _statusRepository.GetByDescricaoAsync(comando.NovoStatus);
-        if (novoStatus == null)
+            var novoStatus = await _statusRepository.GetByDescricaoAsync(comando.NovoStatus);
+            if (novoStatus == null)
+            {
+                StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
+                throw new InvalidOperationException($"Status '{comando.NovoStatus}' nï¿½o encontrado no sistema");
+            }
+
+            var statusAtual = ordem.Status?.Descricao ?? "";
+            var transicaoValida = await ValidarTransicaoStatusAsync(comando.OrdemServicoId, statusAtual, comando.NovoStatus);
+
+            if (!transicaoValida)
+            {
+                _logger.LogWarning("?? Transiï¿½ï¿½o de status nï¿½o permitida: {StatusAtual} -> {NovoStatus}",
+                    statusAtual, comando.NovoStatus);
+                _logger.LogInformation("?? Modo acadï¿½mico: Permitindo transiï¿½ï¿½o para demonstraï¿½ï¿½o");
+            }
+
+            ordem.IdStatus = novoStatus.Id;
+            AtualizarDatasPorStatus(ordem, comando.NovoStatus);
+            await _ordemServicoRepository.UpdateAsync(ordem);
+            _logger.LogInformation("? Status atualizado: OS #{OrdemId} {StatusAntigo} -> {StatusNovo}",
+                comando.OrdemServicoId, statusAtual, comando.NovoStatus);
+            var ordemAtualizada = await _ordemServicoRepository.GetByIdWithDetailsAsync(comando.OrdemServicoId);
+            return MapToDto(ordemAtualizada!);
+        }
+        catch (Exception ex)
         {
-            throw new InvalidOperationException($"Status '{comando.NovoStatus}' não encontrado no sistema");
+            StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
+            _logger.LogError(ex, "Falha ao processar ordem de serviÃ§o");
+            throw;
         }
-
-        var statusAtual = ordem.Status?.Descricao ?? "";
-        var transicaoValida = await ValidarTransicaoStatusAsync(comando.OrdemServicoId, statusAtual, comando.NovoStatus);
-
-        if (!transicaoValida)
-        {
-            _logger.LogWarning("?? Transição de status não permitida: {StatusAtual} -> {NovoStatus}",
-                statusAtual, comando.NovoStatus);
-
-            _logger.LogInformation("?? Modo acadêmico: Permitindo transição para demonstração");
-        }
-
-        ordem.IdStatus = novoStatus.Id;
-
-        AtualizarDatasPorStatus(ordem, comando.NovoStatus);
-
-        await _ordemServicoRepository.UpdateAsync(ordem);
-
-        _logger.LogInformation("? Status atualizado: OS #{OrdemId} {StatusAntigo} -> {StatusNovo}",
-            comando.OrdemServicoId, statusAtual, comando.NovoStatus);
-
-        var ordemAtualizada = await _ordemServicoRepository.GetByIdWithDetailsAsync(comando.OrdemServicoId);
-        return MapToDto(ordemAtualizada!);
     }
 
     public async Task<bool> ValidarTransicaoStatusAsync(int ordemServicoId, string statusAtual, string novoStatus)

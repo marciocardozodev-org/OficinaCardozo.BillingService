@@ -28,6 +28,8 @@ spec:
                 secretKeyRef:
                   name: datadog-secret
                   key: api_key
+            - name: DATADOG_SITE
+              value: us5.datadoghq.com
           image: marciocardozodev/oficinacardozo-api-web:latest
           imagePullPolicy: Always
           ports:

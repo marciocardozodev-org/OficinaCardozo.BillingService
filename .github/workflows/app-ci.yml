@@ -111,7 +111,7 @@ jobs:
         fi
 
         kubectl create secret generic datadog-agent \
-          --from-literal=DD_API_KEY="${{ secrets.DATADOG_API_KEY }}" \
+          --from-literal=api-key="${{ secrets.DATADOG_API_KEY }}" \
           --from-literal=DD_SITE="${{ secrets.DATADOG_SITE }}" \
           --dry-run=client -o yaml | kubectl apply -n "$NAMESPACE" -f -
       env:

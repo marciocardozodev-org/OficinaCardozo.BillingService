@@ -15,11 +15,19 @@ using System.Text;
 using Serilog;
 using Serilog.Formatting.Json;
 
+
 // Configuração do Serilog para logs estruturados em JSON
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .WriteTo.Console(new JsonFormatter())
     .CreateLogger();
+
+// Configuração global do DogStatsD para métricas customizadas
+StatsdClient.Metrics.Configure(new StatsdClient.MetricsConfig
+{
+    StatsdServerName = "datadog-agent",
+    StatsdServerPort = 8125
+});
 
 Log.Information("Iniciando a configuração da API Oficina Cardozo...");
 

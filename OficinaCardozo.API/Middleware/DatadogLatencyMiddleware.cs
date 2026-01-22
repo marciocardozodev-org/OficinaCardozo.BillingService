@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Http;
-using System.Diagnostics;
+using System.Diagnostics; // Para Stopwatch
 using System.Threading.Tasks;
 using System;
 using System.Linq;
+using StatsdClient; // Para Metrics
 
 namespace OficinaCardozo.API.Middleware
 {
@@ -17,7 +18,7 @@ namespace OficinaCardozo.API.Middleware
 
         public async Task InvokeAsync(HttpContext context)
         {
-            var stopwatch = Stopwatch.StartNew();
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             await _next(context);
             stopwatch.Stop();
 
@@ -36,8 +37,25 @@ namespace OficinaCardozo.API.Middleware
                 $"status:{statusCode}"
             };
 
+            // Envio de métrica customizada via DogStatsD
+            try
+            {
+                // Inicializa o Metrics apenas uma vez (ideal: singleton via DI, aqui para exemplo)
+                // Não existe IsConfigured, então use um static flag se necessário (ou sempre configure, pois é idempotente)
+                Metrics.Configure(new MetricsConfig
+                {
+                    StatsdServerName = "localhost", // ajuste para endereço do agente
+                    StatsdServerPort = 8125
+                });
+                Metrics.Timer("api.latency.ms", (int)latencyMs);
+                Serilog.Log.Warning("[DatadogLatencyMiddleware] Métrica enviada via DogStatsD: {Metric} {Latency}ms {Tags}", "api.latency.ms", latencyMs, string.Join(",", tags));
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "Falha ao enviar métrica via DogStatsD");
+            }
 
-            // Log local de latência (Datadog via DogStatsD será implementado)
+            // Log local de latência
             Serilog.Log.Warning("[DatadogLatencyMiddleware] Latência: {Metric} {Latency}ms {Path} {Method} {Status}", "api.latency.ms", latencyMs, path, method, statusCode);
             Console.WriteLine($"[DatadogLatencyMiddleware] (Console) Latência: api.latency.ms {latencyMs}ms {path} {method} {statusCode}");
         }

@@ -18,15 +18,23 @@ public class HealthController : ControllerBase
     [HttpGet("ping")]
     public IActionResult Ping()
     {
-        // Rota simples que não depende de nada
-        return Ok(new
+        try
         {
-            status = "Alive",
-            timestamp = DateTime.UtcNow,
-            version = "1.0.0",
-            environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
-            lambda = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_LAMBDA_FUNCTION_NAME"))
-        });
+            StatsdClient.Metrics.Counter("healthcheck.success", 1);
+            return Ok(new
+            {
+                status = "Alive",
+                timestamp = DateTime.UtcNow,
+                version = "1.0.0",
+                environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
+                lambda = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_LAMBDA_FUNCTION_NAME"))
+            });
+        }
+        catch (Exception ex)
+        {
+            StatsdClient.Metrics.Counter("healthcheck.fail", 1);
+            return StatusCode(500, new { status = "Unhealthy", error = ex.Message });
+        }
     }
 
     [HttpGet]
@@ -37,6 +45,8 @@ public class HealthController : ControllerBase
             // Timeout de 5 segundos para não travar
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             var canConnect = await _context.Database.CanConnectAsync(cts.Token);
+
+            StatsdClient.Metrics.Counter("healthcheck.success", 1);
 
             return Ok(new
             {
@@ -49,6 +59,7 @@ public class HealthController : ControllerBase
         }
         catch (OperationCanceledException)
         {
+            StatsdClient.Metrics.Counter("healthcheck.fail", 1);
             return StatusCode(503, new
             {
                 status = "Unhealthy",
@@ -59,6 +70,7 @@ public class HealthController : ControllerBase
         }
         catch (Exception ex)
         {
+            StatsdClient.Metrics.Counter("healthcheck.fail", 1);
             return StatusCode(503, new
             {
                 status = "Unhealthy",

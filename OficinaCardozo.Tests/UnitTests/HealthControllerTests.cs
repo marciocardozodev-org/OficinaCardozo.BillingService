@@ -1,24 +1,30 @@
-﻿using Xunit;
+﻿using OficinaCardozo.API.Controllers;
 using Microsoft.AspNetCore.Mvc;
-using OficinaCardozo.API.Controllers;
+using Xunit;
+using OficinaCardozo.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+using Moq;
 
-namespace OficinaCardozo.Tests.UnitTests.Controllers;
-
-public class HealthControllerTests
+namespace OficinaCardozo.Tests.UnitTests
 {
-    [Fact]
-    public void Live_ReturnsOk()
+    public class HealthControllerTests
     {
-        // Arrange
-        var controller = new HealthController();
+        [Fact]
+        public void Live_ReturnsOk()
+        {
+            // Arrange
+            var options = new DbContextOptionsBuilder<OficinaDbContext>().Options;
+            var mockDbContext = new Mock<OficinaDbContext>(options);
+            var controller = new HealthController(mockDbContext.Object);
 
-        // Act
-        var result = controller.Live();
+            // Act
+            var result = controller.Live();
 
-        // Assert
-        Assert.IsType<OkObjectResult>(result);
-        var okResult = result as OkObjectResult;
-        Assert.NotNull(okResult);
-        Assert.Equal(200, okResult.StatusCode ?? 200);
+            // Assert
+            Assert.IsType<OkObjectResult>(result);
+            var okResult = result as OkObjectResult;
+            Assert.NotNull(okResult);
+            Assert.Equal(200, okResult.StatusCode ?? 200);
+        }
     }
 }

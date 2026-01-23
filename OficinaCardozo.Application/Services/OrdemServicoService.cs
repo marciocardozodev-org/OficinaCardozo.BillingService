@@ -74,6 +74,8 @@ public class OrdemServicoService : IOrdemServicoService
                 StatsdServerPort = 8125
             });
             _metricsConfigured = true;
+            // Envia métrica de teste no startup
+            StatsdClient.Metrics.Counter("echo_teste.metric", 1);
         }
     }
 

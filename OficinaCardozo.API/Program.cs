@@ -20,6 +20,29 @@ using Serilog.Formatting.Json;
 
 
 var builder = WebApplication.CreateBuilder(args);
+// Configuração JWT Authentication (compatível com ConfigMap/Secret)
+var jwtKey = builder.Configuration["ConfiguracoesJwt:ChaveSecreta"] ?? "sua-chave-jwt-super-secreta";
+var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtKey));
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+    .AddJwtBearer(options =>
+    {
+        options.RequireHttpsMetadata = false;
+        options.SaveToken = true;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = key,
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
+    });
+builder.Services.AddAuthorization();
 
 // Diagnóstico: logar variáveis de ambiente do banco
 Console.WriteLine($"[DIAG] DB_CONNECTION: {Environment.GetEnvironmentVariable("DB_CONNECTION")}");

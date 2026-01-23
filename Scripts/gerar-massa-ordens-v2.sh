@@ -6,7 +6,7 @@
 COUNT=${1:-10}
 API_URL=${2:-http://localhost:5000}
 USER_EMAIL="teste$(date +%s)@exemplo.com"
-USER_NAME="usuarioteste"
+USER_NAME="usuarioteste$(date +%s)"
 USER_PASSWORD="Teste@123"
 
 # 1. Criar usuário
@@ -36,17 +36,48 @@ if [ -z "$TOKEN" ]; then
 fi
 
 # 3. Buscar clientes, serviços e peças
-CLIENTES=$(curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/api/clientes")
-SERVICOS=$(curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/api/servicos")
-PECAS=$(curl -s -H "Authorization: Bearer $TOKEN" "$API_URL/api/pecas")
 
-# Extrair IDs válidos
-CLIENTE_ID=$(echo "$CLIENTES" | grep -o '"id"\s*:\s*[0-9]*' | head -1 | grep -o '[0-9]*')
-SERVICO_ID=$(echo "$SERVICOS" | grep -o '"id"\s*:\s*[0-9]*' | head -1 | grep -o '[0-9]*')
-PECA_ID=$(echo "$PECAS" | grep -o '"id"\s*:\s*[0-9]*' | head -1 | grep -o '[0-9]*')
+# 3. Criar cliente, serviço e peça (garante dados válidos)
+CLIENTE_PAYLOAD='{
+  "nome": "Cliente Teste",
+  "cpfCnpj": "12345678901",
+  "emailPrincipal": "cliente@teste.com",
+  "telefonePrincipal": "(11) 99999-9999",
+  "enderecoPrincipal": "Rua Teste, 123"
+}'
+CLIENTE_RESPONSE=$(curl -s -X POST "$API_URL/api/clientes" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d "$CLIENTE_PAYLOAD")
+CLIENTE_ID=$(echo "$CLIENTE_RESPONSE" | grep -o '"id"\s*:\s*[0-9]*' | head -1 | grep -o '[0-9]*')
+
+SERVICO_PAYLOAD='{
+  "nomeServico": "Troca de Óleo",
+  "preco": 150.00,
+  "tempoEstimadoExecucao": 60,
+  "descricaoDetalhadaServico": "Troca de óleo do motor com filtro",
+  "frequenciaRecomendada": "A cada 10.000 km ou 6 meses"
+}'
+SERVICO_RESPONSE=$(curl -s -X POST "$API_URL/api/servicos" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d "$SERVICO_PAYLOAD")
+SERVICO_ID=$(echo "$SERVICO_RESPONSE" | grep -o '"id"\s*:\s*[0-9]*' | head -1 | grep -o '[0-9]*')
+
+PECA_PAYLOAD='{
+  "nome": "Filtro de Óleo",
+  "preco": 35.00,
+  "quantidadeEstoque": 100,
+  "observacoes": "Filtro compatível com modelos populares"
+}'
+PECA_RESPONSE=$(curl -s -X POST "$API_URL/api/pecas" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d "$PECA_PAYLOAD")
+PECA_ID=$(echo "$PECA_RESPONSE" | grep -o '"id"\s*:\s*[0-9]*' | head -1 | grep -o '[0-9]*')
 
 if [ -z "$CLIENTE_ID" ] || [ -z "$SERVICO_ID" ] || [ -z "$PECA_ID" ]; then
-  echo "Não foi possível obter IDs válidos de cliente, serviço ou peça."
+  echo "Não foi possível criar ou obter IDs válidos de cliente, serviço ou peça."
   exit 1
 fi
 

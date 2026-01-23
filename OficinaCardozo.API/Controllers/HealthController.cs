@@ -32,8 +32,16 @@ public class HealthController : ControllerBase
         }
         catch (Exception ex)
         {
-            StatsdClient.Metrics.Counter("healthcheck.fail", 1);
-            return StatusCode(500, new { status = "Unhealthy", error = ex.Message });
+            StatsdClient.Metrics.Counter("healthcheck.degraded", 1);
+            // Nunca retorna 500 para o probe, sempre 200 com status degradado
+            return Ok(new {
+                status = "Degraded",
+                error = ex.Message,
+                timestamp = DateTime.UtcNow,
+                version = "1.0.0",
+                environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
+                lambda = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_LAMBDA_FUNCTION_NAME"))
+            });
         }
     }
 

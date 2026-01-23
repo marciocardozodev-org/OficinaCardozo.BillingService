@@ -15,6 +15,10 @@ public class HealthController : ControllerBase
         _context = context;
     }
 
+    [HttpGet("live")]
+    public IActionResult Live() => Ok(new { status = "Live" });
+
+
     [HttpGet("ping")]
     public IActionResult Ping()
     {

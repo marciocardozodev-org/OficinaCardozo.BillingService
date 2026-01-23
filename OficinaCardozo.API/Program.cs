@@ -12,8 +12,7 @@ using OficinaCardozo.Domain.Interfaces;
 using OficinaCardozo.Infrastructure.Data;
 using OficinaCardozo.Infrastructure.Repositories;
 using System.Text;
-using Serilog;
-using Serilog.Formatting.Json;
+// Serilog removido para teste de isolamento
 // using Serilog.Enrichers; // ActivityEnricher não suportado em net8.0
 
 
@@ -21,10 +20,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 try
 {
-    Console.WriteLine("[Program] Antes de UseSerilog");
-    // Substitui o logger padrão pelo Serilog
-    builder.Host.UseSerilog();
-    Console.WriteLine("[Program] Depois de UseSerilog");
+    // Serilog removido para teste de isolamento
 
     // Configuração global do DogStatsD para métricas customizadas
     StatsdClient.Metrics.Configure(new StatsdClient.MetricsConfig
@@ -35,7 +31,7 @@ try
     // Envia métrica de teste no startup global
     StatsdClient.Metrics.Counter("echo_teste.metric", 1);
 
-    Log.Information("Iniciando a configuração da API Oficina Cardozo...");
+    // Log removido (Serilog)
 
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
@@ -91,7 +87,7 @@ try
         await next();
     });
 
-    Log.Information("📋 Configurando Swagger...");
+    // Log removido (Serilog)
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
@@ -117,7 +113,7 @@ try
         });
     }
 
-    Log.Information("🔐 Configurando CORS, Authentication e Authorization...");
+    // Log removido (Serilog)
     app.UseCors("AllowAll");
 
     // Middleware de latência do Datadog (deve vir após UseRouting e antes dos controllers)
@@ -129,15 +125,14 @@ try
 
     app.MapControllers();
 
-    Log.Information("✅ Aplicação configurada e pronta para iniciar.");
+    // Log removido (Serilog)
 
     app.Run();
-    Log.CloseAndFlush();
+    // Log removido (Serilog)
 }
 catch (Exception ex)
 {
-    Log.Fatal(ex, "💥 ERRO FATAL: A aplicação falhou ao iniciar.");
-    Log.CloseAndFlush();
+    Console.WriteLine($"[Program] ERRO FATAL: {ex.GetType().Name} - {ex.Message}\n{ex.StackTrace}");
     Environment.Exit(1);
 }
 

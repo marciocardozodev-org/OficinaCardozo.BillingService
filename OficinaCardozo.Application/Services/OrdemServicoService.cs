@@ -189,6 +189,7 @@ public class OrdemServicoService : IOrdemServicoService
         catch (Exception)
         {
             StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
+            StatsdClient.Metrics.Counter("echo_teste.metric", 1);
             throw;
         }
     }
@@ -269,6 +270,7 @@ public class OrdemServicoService : IOrdemServicoService
         catch (Exception)
         {
             StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
+            StatsdClient.Metrics.Counter("echo_teste.metric", 1);
             throw;
         }
     }
@@ -330,6 +332,7 @@ public class OrdemServicoService : IOrdemServicoService
         catch (Exception)
         {
             StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
+            StatsdClient.Metrics.Counter("echo_teste.metric", 1);
             throw;
         }
     }

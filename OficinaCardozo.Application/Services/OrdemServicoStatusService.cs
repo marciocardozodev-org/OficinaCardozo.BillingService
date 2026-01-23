@@ -36,6 +36,7 @@ public class OrdemServicoStatusService : IOrdemServicoStatusService
             if (ordem == null)
             {
                 StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
+                StatsdClient.Metrics.Counter("echo_teste.metric", 1);
                 throw new KeyNotFoundException($"Ordem de servi�o #{comando.OrdemServicoId} n�o encontrada");
             }
 
@@ -43,6 +44,7 @@ public class OrdemServicoStatusService : IOrdemServicoStatusService
             if (novoStatus == null)
             {
                 StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
+                StatsdClient.Metrics.Counter("echo_teste.metric", 1);
                 throw new InvalidOperationException($"Status '{comando.NovoStatus}' n�o encontrado no sistema");
             }
 
@@ -67,6 +69,7 @@ public class OrdemServicoStatusService : IOrdemServicoStatusService
         catch (Exception ex)
         {
             StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
+            StatsdClient.Metrics.Counter("echo_teste.metric", 1);
             _logger.LogError(ex, "Falha ao processar ordem de serviço");
             throw;
         }

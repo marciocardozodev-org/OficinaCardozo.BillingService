@@ -58,19 +58,19 @@ spec:
               memory: "512Mi"
           readinessProbe:
             httpGet:
-              path: "/Health/ping"
+              path: "/Health/live"
+              port: 8080
+            initialDelaySeconds: 10
+            timeoutSeconds: 3
+            periodSeconds: 5
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: "/Health/live"
               port: 8080
             initialDelaySeconds: 30
             timeoutSeconds: 3
             periodSeconds: 10
-            failureThreshold: 5
-          livenessProbe:
-            httpGet:
-              path: "/Health/ping"
-              port: 8080
-            initialDelaySeconds: 60
-            timeoutSeconds: 3
-            periodSeconds: 20
             failureThreshold: 5
 ---
 # Namespace é definido externamente pelo pipeline (K8S_NAMESPACE_*)

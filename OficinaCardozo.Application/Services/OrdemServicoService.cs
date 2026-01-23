@@ -65,6 +65,7 @@ public class OrdemServicoService : IOrdemServicoService
         _orcamentoRepository = orcamentoRepository;
         _ordemServicoStatusRepository = ordemServicoStatusRepository;
         _orcamentoStatusRepository = orcamentoStatusRepository;
+
         // Configura StatsdClient.Metrics apenas uma vez
         if (!_metricsConfigured)
         {

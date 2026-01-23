@@ -60,14 +60,18 @@ spec:
             httpGet:
               path: "/Health/ping"
               port: 8080
-            initialDelaySeconds: 20
+            initialDelaySeconds: 30
+            timeoutSeconds: 3
             periodSeconds: 10
+            failureThreshold: 5
           livenessProbe:
             httpGet:
               path: "/Health/ping"
               port: 8080
-            initialDelaySeconds: 40
+            initialDelaySeconds: 60
+            timeoutSeconds: 3
             periodSeconds: 20
+            failureThreshold: 5
 ---
 # Namespace é definido externamente pelo pipeline (K8S_NAMESPACE_*)
 # Este Deployment assume que secrets/configmaps de conexão (DB, JWT, Email) serão

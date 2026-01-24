@@ -65,17 +65,19 @@ SERVICO_RESPONSE=$(curl -s -X POST "$API_URL/api/servicos" \
 echo "Resposta /api/servicos: $SERVICO_RESPONSE"
 SERVICO_ID=$(echo "$SERVICO_RESPONSE" | grep -o '"id"\s*:\s*[0-9]*' | head -1 | grep -o '[0-9]*')
 
-PECA_NOME="Filtro de Óleo $(date +%s%N | cut -b1-13)"
-PECA_CODIGO="FILTRO-$(date +%s%N | cut -b1-13)"
+
+# Cria uma nova peça com estoque suficiente para garantir ordens
+PECA_NOME="Pastilha de Freio $(date +%s%N | cut -b1-13)"
+PECA_CODIGO="PASTILHA-$(date +%s%N | cut -b1-13)"
 PECA_PAYLOAD='{
   "nomePeca": "'$PECA_NOME'",
   "codigoIdentificador": "'$PECA_CODIGO'",
-  "preco": 35.00,
+  "preco": 50.00,
   "quantidadeEstoque": 100,
-  "quantidadeMinima": 10,
+  "quantidadeMinima": 5,
   "unidadeMedida": "un",
-  "localizacaoEstoque": "Prateleira 1",
-  "observacoes": "Filtro compatível com modelos populares"
+  "localizacaoEstoque": "Prateleira 2",
+  "observacoes": "Pastilha para teste de massa"
 }'
 PECA_RESPONSE=$(curl -s -X POST "$API_URL/api/pecas" \
   -H "Content-Type: application/json" \

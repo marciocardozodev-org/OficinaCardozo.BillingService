@@ -238,6 +238,7 @@ public class OrdemServicoService : IOrdemServicoService
 
     public async Task<OrcamentoResumoDto> IniciarDiagnosticoAsync(int ordemServicoId)
     {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             var ordemServicoDetails = await _ordemServicoRepository.GetByIdWithDetailsAsync(ordemServicoId);
@@ -264,7 +265,7 @@ public class OrdemServicoService : IOrdemServicoService
 
             var orcamento = await GerarOrcamentoAsync(ordemServicoId);
 
-            return new OrcamentoResumoDto
+            var result = new OrcamentoResumoDto
             {
                 Id = orcamento.Id,
                 DataOrcamento = orcamento.DataOrcamento,
@@ -276,6 +277,9 @@ public class OrdemServicoService : IOrdemServicoService
                 ValorTotal = 0,
                 MensagemAprovacao = "Diagnostico iniciado. Orçamento Em elaboracao."
             };
+            stopwatch.Stop();
+            StatsdClient.Metrics.Timer("oficinacardozo.ordem_servico.tempo_iniciar_diagnostico_ms", (int)stopwatch.ElapsedMilliseconds);
+            return result;
         }
         catch (Exception)
         {
@@ -287,6 +291,7 @@ public class OrdemServicoService : IOrdemServicoService
 
     public async Task<OrcamentoResumoDto> FinalizarDiagnosticoAsync(int ordemServicoId)
     {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             var ordemServicoDetails = await _ordemServicoRepository.GetByIdWithDetailsAsync(ordemServicoId);
@@ -326,7 +331,7 @@ public class OrdemServicoService : IOrdemServicoService
                 await _orcamentoRepository.UpdateAsync(orcamento);
             }
 
-            return new OrcamentoResumoDto
+            var result = new OrcamentoResumoDto
             {
                 Id = orcamento.Id,
                 DataOrcamento = orcamento.DataOrcamento,
@@ -338,6 +343,9 @@ public class OrdemServicoService : IOrdemServicoService
                 ValorTotal = CalcularValorTotalOrcamento(orcamento),
                 MensagemAprovacao = "Diagnóstico finalizado! Orçamento elaborado e pronto para ser enviado ao cliente."
             };
+            stopwatch.Stop();
+            StatsdClient.Metrics.Timer("oficinacardozo.ordem_servico.tempo_finalizar_diagnostico_ms", (int)stopwatch.ElapsedMilliseconds);
+            return result;
         }
         catch (Exception)
         {
@@ -532,19 +540,25 @@ public class OrdemServicoService : IOrdemServicoService
 
     public async Task<OrdemServicoDto> IniciarExecucaoAsync(int ordemServicoId)
     {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var ordemServico = await _ordemServicoRepository.GetByIdWithDetailsAsync(ordemServicoId);
         if (ordemServico == null)
             throw new KeyNotFoundException("Ordem de serviço não encontrada");
 
         var statusEmExecucao = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.EM_EXECUCAO);
         if (ordemServico.IdStatus == statusEmExecucao?.Id)
-            return MapToDto(ordemServico); 
+        {
+            stopwatch.Stop();
+            StatsdClient.Metrics.Timer("oficinacardozo.ordem_servico.tempo_iniciar_execucao_ms", (int)stopwatch.ElapsedMilliseconds);
+            return MapToDto(ordemServico);
+        }
 
         throw new InvalidOperationException("Ordem de Serviço deve estar 'Em execucao' aprovação do orçamento");
     }
 
     public async Task<OrdemServicoDto> FinalizarServicoAsync(int ordemServicoId)
     {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var ordemServicoDetails = await _ordemServicoRepository.GetByIdWithDetailsAsync(ordemServicoId);
         if (ordemServicoDetails == null)
             throw new KeyNotFoundException("Ordem de serviço não encontrada");
@@ -569,10 +583,13 @@ public class OrdemServicoService : IOrdemServicoService
         await _ordemServicoRepository.UpdateAsync(ordemServicoParaUpdate);
 
         var ordemAtualizada = await _ordemServicoRepository.GetByIdWithDetailsAsync(ordemServicoId);
+        stopwatch.Stop();
+        StatsdClient.Metrics.Timer("oficinacardozo.ordem_servico.tempo_finalizar_servico_ms", (int)stopwatch.ElapsedMilliseconds);
         return MapToDto(ordemAtualizada!);
     }
     public async Task<OrdemServicoDto> EntregarVeiculoAsync(int ordemServicoId)
     {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var ordemServicoDetails = await _ordemServicoRepository.GetByIdWithDetailsAsync(ordemServicoId);
         if (ordemServicoDetails == null)
             throw new KeyNotFoundException("Ordem de serviço não encontrada");
@@ -597,6 +614,8 @@ public class OrdemServicoService : IOrdemServicoService
         await _ordemServicoRepository.UpdateAsync(ordemServicoParaUpdate);
 
         var ordemAtualizada = await _ordemServicoRepository.GetByIdWithDetailsAsync(ordemServicoId);
+        stopwatch.Stop();
+        StatsdClient.Metrics.Timer("oficinacardozo.ordem_servico.tempo_entregar_veiculo_ms", (int)stopwatch.ElapsedMilliseconds);
         return MapToDto(ordemAtualizada!);
     }
 

@@ -1,7 +1,7 @@
 using OficinaCardozo.Application.DTOs;
 using OficinaCardozo.Application.Interfaces;
 using OficinaCardozo.Domain.Entities;
-using OficinaCardozo.Domain.Interfaces.Repositories;
+using OficinaCardozo.App.OficinaCardozo.Domain.Interfaces.Repositories;
 using OficinaCardozo.Domain.ValueObjects;
 using OficinaCardozo.Domain.Exceptions;
 

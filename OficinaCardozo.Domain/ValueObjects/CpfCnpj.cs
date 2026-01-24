@@ -1,5 +1,5 @@
 using OficinaCardozo.Domain.Exceptions;
-using OficinaCardozo.Domain.Interfaces.Services;
+using OficinaCardozo.App.OficinaCardozo.Domain.Interfaces.Services;
 
 namespace OficinaCardozo.Domain.ValueObjects;
 

@@ -13,7 +13,7 @@ public class AutenticacaoController : ControllerBase
 {
     private readonly ILogger<AutenticacaoController> _logger;
     private readonly IAutenticacaoService _autenticacaoService;
-
+    //comentario de teste
     public AutenticacaoController(IAutenticacaoService autenticacaoService, ILogger<AutenticacaoController> logger)
     {
         _autenticacaoService = autenticacaoService;

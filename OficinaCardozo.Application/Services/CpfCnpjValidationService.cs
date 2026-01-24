@@ -1,5 +1,5 @@
-using OficinaCardozo.App.OficinaCardozo.Domain.Interfaces.Repositories;
-using OficinaCardozo.App.OficinaCardozo.Domain.Interfaces.Services;
+using OficinaCardozo.Domain.Interfaces.Repositories;
+using OficinaCardozo.Domain.Interfaces.Services;
 
 namespace OficinaCardozo.Application.Services;
 

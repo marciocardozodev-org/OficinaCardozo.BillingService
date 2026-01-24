@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using OficinaCardozo.Domain.Entities;
-using OficinaCardozo.App.OficinaCardozo.Domain.Interfaces.Repositories;
+using OficinaCardozo.Domain.Interfaces.Repositories;
 using OficinaCardozo.Infrastructure.Data;
 using System.Globalization;
 using System.Text;

@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OficinaCardozo.Domain.Entities;
-using OficinaCardozo.Domain.Interfaces;
+using OficinaCardozo.Domain.Interfaces.Repositories;
 using OficinaCardozo.Infrastructure.Data;
 
 namespace OficinaCardozo.Infrastructure.Repositories;
@@ -14,7 +14,7 @@ public class ClienteRepository : IClienteRepository
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    #region Métodos em inglês (existentes)
+    #region Mï¿½todos em inglï¿½s (existentes)
 
     public async Task<IEnumerable<Cliente>> GetAllAsync()
     {
@@ -94,7 +94,7 @@ public class ClienteRepository : IClienteRepository
 
     #endregion
 
-    #region Métodos em português (nova nomenclatura)
+    #region Mï¿½todos em portuguï¿½s (nova nomenclatura)
 
     public async Task<IEnumerable<Cliente>> ObterTodosAsync()
         => await GetAllAsync();

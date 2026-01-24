@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OficinaCardozo.Domain.Entities;
-using OficinaCardozo.Domain.Interfaces;
+using OficinaCardozo.Domain.Interfaces.Repositories;
 using OficinaCardozo.Infrastructure.Data;
 
 namespace OficinaCardozo.Infrastructure.Repositories;
@@ -97,7 +97,7 @@ public class PecaRepository : IPecaRepository
         }
         else
         {
-            throw new ArgumentException("Tipo de movimentação inválido. Use ENTRADA ou SAIDA");
+            throw new ArgumentException("Tipo de movimentaï¿½ï¿½o invï¿½lido. Use ENTRADA ou SAIDA");
         }
 
         await _context.SaveChangesAsync();

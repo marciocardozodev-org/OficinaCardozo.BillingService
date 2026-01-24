@@ -3,7 +3,7 @@ using Microsoft.IdentityModel.Tokens;
 using OficinaCardozo.Application.DTOs;
 using OficinaCardozo.Application.Settings;
 using OficinaCardozo.Domain.Entities;
-using OficinaCardozo.Domain.Interfaces;
+using OficinaCardozo.Domain.Interfaces.Repositories;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;

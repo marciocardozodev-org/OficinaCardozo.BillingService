@@ -1,4 +1,5 @@
-using OficinaCardozo.Domain.Interfaces;
+using OficinaCardozo.Domain.Interfaces.Repositories;
+using OficinaCardozo.Domain.Interfaces.Services;
 
 namespace OficinaCardozo.Application.Services;
 
@@ -29,13 +30,13 @@ public class CpfCnpjValidationService : ICpfCnpjValidationService
         if (cpfLimpo.Length != 11)
             return false;
 
-        // Verifica se todos os dígitos são iguais
+        // Verifica se todos os dï¿½gitos sï¿½o iguais
         if (cpfLimpo.All(c => c == cpfLimpo[0]))
             return false;
 
         var digitos = cpfLimpo.Select(c => int.Parse(c.ToString())).ToArray();
 
-        // Valida primeiro dígito verificador
+        // Valida primeiro dï¿½gito verificador
         var soma = 0;
         for (int i = 0; i < 9; i++)
             soma += digitos[i] * (10 - i);
@@ -46,7 +47,7 @@ public class CpfCnpjValidationService : ICpfCnpjValidationService
         if (digitos[9] != digitoVerificador1)
             return false;
 
-        // Valida segundo dígito verificador
+        // Valida segundo dï¿½gito verificador
         soma = 0;
         for (int i = 0; i < 10; i++)
             soma += digitos[i] * (11 - i);
@@ -67,17 +68,17 @@ public class CpfCnpjValidationService : ICpfCnpjValidationService
         if (cnpjLimpo.Length != 14)
             return false;
 
-        // Verifica se todos os dígitos são iguais
+        // Verifica se todos os dï¿½gitos sï¿½o iguais
         if (cnpjLimpo.All(c => c == cnpjLimpo[0]))
             return false;
 
         var digitos = cnpjLimpo.Select(c => int.Parse(c.ToString())).ToArray();
 
-        // Multiplicadores para validação
+        // Multiplicadores para validaï¿½ï¿½o
         var multiplicadores1 = new[] { 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2 };
         var multiplicadores2 = new[] { 6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2 };
 
-        // Valida primeiro dígito verificador
+        // Valida primeiro dï¿½gito verificador
         var soma = 0;
         for (int i = 0; i < 12; i++)
             soma += digitos[i] * multiplicadores1[i];
@@ -88,7 +89,7 @@ public class CpfCnpjValidationService : ICpfCnpjValidationService
         if (digitos[12] != digitoVerificador1)
             return false;
 
-        // Valida segundo dígito verificador
+        // Valida segundo dï¿½gito verificador
         soma = 0;
         for (int i = 0; i < 13; i++)
             soma += digitos[i] * multiplicadores2[i];

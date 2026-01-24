@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OficinaCardozo.Domain.Entities;
-using OficinaCardozo.Domain.Interfaces;
+using OficinaCardozo.Domain.Interfaces.Repositories;
 using OficinaCardozo.Infrastructure.Data;
 
 namespace OficinaCardozo.Infrastructure.Repositories;
@@ -87,7 +87,7 @@ public class OrcamentoRepository : IOrcamentoRepository
             .FirstOrDefaultAsync(o => o.Id == orcamento.Id);
 
         if (existingOrcamento == null)
-            throw new KeyNotFoundException($"Orçamento com ID {orcamento.Id} não encontrado");
+            throw new KeyNotFoundException($"Orï¿½amento com ID {orcamento.Id} nï¿½o encontrado");
 
         existingOrcamento.IdStatus = orcamento.IdStatus;
         existingOrcamento.DataOrcamento = orcamento.DataOrcamento;

@@ -1,6 +1,6 @@
 using OficinaCardozo.Application.DTOs;
 using OficinaCardozo.Domain.Entities;
-using OficinaCardozo.Domain.Interfaces;
+using OficinaCardozo.Domain.Interfaces.Repositories;
 
 namespace OficinaCardozo.Application.Services;
 
@@ -45,7 +45,7 @@ public class PecaService : IPecaService
     public async Task<PecaDto> CreateAsync(CreatePecaDto createDto)
     {
         if (await _pecaRepository.ExistsByCodigoAsync(createDto.CodigoIdentificador))
-            throw new InvalidOperationException("Código identificador já cadastrado no sistema");
+            throw new InvalidOperationException("Cï¿½digo identificador jï¿½ cadastrado no sistema");
 
         var peca = new Peca
         {
@@ -67,11 +67,11 @@ public class PecaService : IPecaService
     {
         var peca = await _pecaRepository.GetByIdAsync(id);
         if (peca == null)
-            throw new KeyNotFoundException("Peça não encontrada");
+            throw new KeyNotFoundException("Peï¿½a nï¿½o encontrada");
 
         if (!string.IsNullOrWhiteSpace(updateDto.CodigoIdentificador) &&
             await _pecaRepository.ExistsByCodigoAsync(updateDto.CodigoIdentificador, id))
-            throw new InvalidOperationException("Código identificador já cadastrado para outra peça");
+            throw new InvalidOperationException("Cï¿½digo identificador jï¿½ cadastrado para outra peï¿½a");
 
         if (!string.IsNullOrWhiteSpace(updateDto.NomePeca))
             peca.NomePeca = updateDto.NomePeca;
@@ -104,7 +104,7 @@ public class PecaService : IPecaService
     public async Task<bool> DeleteAsync(int id)
     {
         if (!await _pecaRepository.ExistsAsync(id))
-            throw new KeyNotFoundException("Peça não encontrada");
+            throw new KeyNotFoundException("Peï¿½a nï¿½o encontrada");
 
         return await _pecaRepository.DeleteAsync(id);
     }
@@ -112,7 +112,7 @@ public class PecaService : IPecaService
     public async Task<bool> MovimentarEstoqueAsync(int id, MovimentacaoEstoqueDto movimentacaoDto)
     {
         if (!await _pecaRepository.ExistsAsync(id))
-            throw new KeyNotFoundException("Peça não encontrada");
+            throw new KeyNotFoundException("Peï¿½a nï¿½o encontrada");
 
         return await _pecaRepository.MovimentarEstoqueAsync(id, movimentacaoDto.Quantidade, movimentacaoDto.Tipo);
     }

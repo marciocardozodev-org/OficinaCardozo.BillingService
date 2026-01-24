@@ -1,4 +1,4 @@
-namespace OficinaCardozo.Domain.Interfaces;
+namespace OficinaCardozo.Domain.Interfaces.Services;
 
 public interface ICpfCnpjValidationService
 {

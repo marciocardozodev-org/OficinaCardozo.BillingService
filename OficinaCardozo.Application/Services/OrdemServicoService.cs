@@ -1,7 +1,7 @@
 ﻿using OficinaCardozo.Application.DTOs;
 using OficinaCardozo.Domain.Entities;
 
-using OficinaCardozo.Domain.Interfaces;
+using OficinaCardozo.Domain.Interfaces.Repositories;
 using StatsdClient;
 
 namespace OficinaCardozo.Application.Services;

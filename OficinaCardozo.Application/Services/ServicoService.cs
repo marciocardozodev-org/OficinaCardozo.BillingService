@@ -1,7 +1,7 @@
 using OficinaCardozo.Application.DTOs;
 using OficinaCardozo.Application.Interfaces;
 using OficinaCardozo.Domain.Entities;
-using OficinaCardozo.Domain.Interfaces;
+using OficinaCardozo.Domain.Interfaces.Repositories;
 using OficinaCardozo.Domain.ValueObjects;
 using OficinaCardozo.Domain.Exceptions;
 
@@ -20,7 +20,7 @@ public class ServicoService : IServicoService
         _servicoMapper = servicoMapper ?? throw new ArgumentNullException(nameof(servicoMapper));
     }
 
-    #region Métodos em português (Clean Architecture)
+    #region Mï¿½todos em portuguï¿½s (Clean Architecture)
 
     public async Task<IEnumerable<ServicoDto>> ObterTodosServicosAsync()
     {
@@ -39,7 +39,7 @@ public class ServicoService : IServicoService
     public async Task<IEnumerable<ServicoDto>> BuscarServicosPorNomeAsync(string nome)
     {
         if (string.IsNullOrWhiteSpace(nome))
-            throw new ArgumentException("Nome para busca não pode estar vazio", nameof(nome));
+            throw new ArgumentException("Nome para busca nï¿½o pode estar vazio", nameof(nome));
 
         var servicos = await _servicoRepository.GetAllAsync();
         var servicosFiltrados = servicos.Where(s =>
@@ -99,7 +99,7 @@ public class ServicoService : IServicoService
 
     #endregion
 
-    #region Métodos em inglês (compatibilidade)
+    #region Mï¿½todos em inglï¿½s (compatibilidade)
 
     public async Task<IEnumerable<ServicoDto>> GetAllAsync()
         => await ObterTodosServicosAsync();
@@ -118,7 +118,7 @@ public class ServicoService : IServicoService
 
     #endregion
 
-    #region Métodos privados de validação
+    #region Mï¿½todos privados de validaï¿½ï¿½o
 
     private static void ValidarId(int id)
     {
@@ -131,10 +131,10 @@ public class ServicoService : IServicoService
         ArgumentNullException.ThrowIfNull(dto);
 
         if (string.IsNullOrWhiteSpace(dto.NomeServico))
-            throw new ArgumentException("Nome do serviço é obrigatório", nameof(dto.NomeServico));
+            throw new ArgumentException("Nome do serviï¿½o ï¿½ obrigatï¿½rio", nameof(dto.NomeServico));
 
         if (dto.Preco <= 0)
-            throw new ArgumentException("Preço deve ser maior que zero", nameof(dto.Preco));
+            throw new ArgumentException("Preï¿½o deve ser maior que zero", nameof(dto.Preco));
 
         if (dto.TempoEstimadoExecucao <= 0)
             throw new ArgumentException("Tempo estimado deve ser maior que zero", nameof(dto.TempoEstimadoExecucao));
@@ -145,7 +145,7 @@ public class ServicoService : IServicoService
         ArgumentNullException.ThrowIfNull(dto);
 
         if (dto.Preco.HasValue && dto.Preco <= 0)
-            throw new ArgumentException("Preço deve ser maior que zero", nameof(dto.Preco));
+            throw new ArgumentException("Preï¿½o deve ser maior que zero", nameof(dto.Preco));
 
         if (dto.TempoEstimadoExecucao.HasValue && dto.TempoEstimadoExecucao <= 0)
             throw new ArgumentException("Tempo estimado deve ser maior que zero", nameof(dto.TempoEstimadoExecucao));

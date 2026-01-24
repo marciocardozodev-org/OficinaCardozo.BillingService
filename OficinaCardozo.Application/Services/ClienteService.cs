@@ -1,9 +1,11 @@
 using OficinaCardozo.Application.DTOs;
 using OficinaCardozo.Application.Interfaces;
 using OficinaCardozo.Domain.Entities;
-using OficinaCardozo.Domain.Interfaces;
+using OficinaCardozo.Domain.Interfaces.Repositories;
+
 using OficinaCardozo.Domain.ValueObjects;
 using OficinaCardozo.Domain.Exceptions;
+using OficinaCardozo.Domain.Interfaces.Services;
 
 namespace OficinaCardozo.Application.Services;
 
@@ -41,7 +43,7 @@ public class ClienteService : IClienteService
     {
         ValidarDtoCreate(createDto);
 
-        // CORREÇÃO: Passa o serviço de validação como segundo parâmetro
+        // CORREï¿½ï¿½O: Passa o serviï¿½o de validaï¿½ï¿½o como segundo parï¿½metro
         var cpfCnpj = new CpfCnpj(createDto.CpfCnpj, _cpfCnpjValidator);
         await ValidarCpfCnpjUnicoAsync(cpfCnpj);
 
@@ -60,7 +62,7 @@ public class ClienteService : IClienteService
 
         if (!string.IsNullOrWhiteSpace(updateDto.CpfCnpj))
         {
-            // CORREÇÃO: Passa o serviço de validação como segundo parâmetro
+            // CORREï¿½ï¿½O: Passa o serviï¿½o de validaï¿½ï¿½o como segundo parï¿½metro
             var novoCpfCnpj = new CpfCnpj(updateDto.CpfCnpj, _cpfCnpjValidator);
             await ValidarCpfCnpjUnicoParaAtualizacaoAsync(novoCpfCnpj, id);
         }
@@ -93,10 +95,10 @@ public class ClienteService : IClienteService
         ArgumentNullException.ThrowIfNull(dto);
 
         if (string.IsNullOrWhiteSpace(dto.Nome))
-            throw new ArgumentException("Nome é obrigatório", nameof(dto.Nome));
+            throw new ArgumentException("Nome ï¿½ obrigatï¿½rio", nameof(dto.Nome));
 
         if (string.IsNullOrWhiteSpace(dto.CpfCnpj))
-            throw new ArgumentException("CPF/CNPJ é obrigatório", nameof(dto.CpfCnpj));
+            throw new ArgumentException("CPF/CNPJ ï¿½ obrigatï¿½rio", nameof(dto.CpfCnpj));
     }
 
     private static void ValidarDtoUpdate(UpdateClienteDto dto)

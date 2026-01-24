@@ -1,6 +1,6 @@
 using OficinaCardozo.Domain.Entities;
 
-namespace OficinaCardozo.Domain.Interfaces;
+namespace OficinaCardozo.Domain.Interfaces.Repositories;
 
 public interface IUsuarioRepository
 {

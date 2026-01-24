@@ -1,7 +1,7 @@
 using OficinaCardozo.Application.DTOs;
 using OficinaCardozo.Application.Interfaces;
 using OficinaCardozo.Domain.Entities;
-using OficinaCardozo.Domain.Interfaces;
+using OficinaCardozo.Domain.Interfaces.Repositories;
 using OficinaCardozo.Domain.ValueObjects;
 using OficinaCardozo.Domain.Exceptions;
 
@@ -24,7 +24,7 @@ public class VeiculoService : IVeiculoService
         _veiculoMapper = veiculoMapper ?? throw new ArgumentNullException(nameof(veiculoMapper));
 
     }
-    #region Métodos em português (Clean Architecture)
+    #region Mï¿½todos em portuguï¿½s (Clean Architecture)
 
     public async Task<IEnumerable<VeiculoDto>> ObterTodosVeiculosAsync()
     {
@@ -51,7 +51,7 @@ public class VeiculoService : IVeiculoService
     public async Task<VeiculoDto?> ObterVeiculoPorPlacaAsync(string placa)
     {
         if (string.IsNullOrWhiteSpace(placa))
-            throw new ArgumentException("Placa não pode estar vazia", nameof(placa));
+            throw new ArgumentException("Placa nï¿½o pode estar vazia", nameof(placa));
 
         var placaObj = new Placa(placa);
         var veiculo = await _veiculoRepository.GetByPlacaAsync(placaObj.Valor);
@@ -113,7 +113,7 @@ public class VeiculoService : IVeiculoService
 
     #endregion
 
-    #region Métodos em inglês (compatibilidade)
+    #region Mï¿½todos em inglï¿½s (compatibilidade)
 
     public async Task<IEnumerable<VeiculoDto>> GetAllAsync()
         => await ObterTodosVeiculosAsync();
@@ -138,7 +138,7 @@ public class VeiculoService : IVeiculoService
 
     #endregion
 
-    #region Métodos privados de validação
+    #region Mï¿½todos privados de validaï¿½ï¿½o
 
     private static void ValidarId(int id)
     {
@@ -154,10 +154,10 @@ public class VeiculoService : IVeiculoService
             throw new ArgumentException("ID do cliente deve ser maior que zero", nameof(dto.IdCliente));
 
         if (string.IsNullOrWhiteSpace(dto.Placa))
-            throw new ArgumentException("Placa é obrigatória", nameof(dto.Placa));
+            throw new ArgumentException("Placa ï¿½ obrigatï¿½ria", nameof(dto.Placa));
 
         if (string.IsNullOrWhiteSpace(dto.MarcaModelo))
-            throw new ArgumentException("Marca/Modelo é obrigatório", nameof(dto.MarcaModelo));
+            throw new ArgumentException("Marca/Modelo ï¿½ obrigatï¿½rio", nameof(dto.MarcaModelo));
     }
 
     private static void ValidarDtoUpdate(UpdateVeiculoDto dto)

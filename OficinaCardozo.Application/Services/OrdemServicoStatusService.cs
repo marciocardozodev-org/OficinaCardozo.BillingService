@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 using OficinaCardozo.Application.DTOs;
-using OficinaCardozo.Domain.Interfaces;
+using OficinaCardozo.Domain.Interfaces.Repositories;
 
 namespace OficinaCardozo.Application.Services;
 

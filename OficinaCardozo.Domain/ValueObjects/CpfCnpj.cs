@@ -1,5 +1,5 @@
 using OficinaCardozo.Domain.Exceptions;
-using OficinaCardozo.Domain.Interfaces;
+using OficinaCardozo.Domain.Interfaces.Services;
 
 namespace OficinaCardozo.Domain.ValueObjects;
 
@@ -13,7 +13,7 @@ public record CpfCnpj
         ArgumentNullException.ThrowIfNull(validationService);
 
         if (string.IsNullOrWhiteSpace(valor))
-            throw new ArgumentException("CPF/CNPJ não pode estar vazio", nameof(valor));
+            throw new ArgumentException("CPF/CNPJ nï¿½o pode estar vazio", nameof(valor));
 
         var valorLimpo = validationService.LimparFormatacao(valor);
 

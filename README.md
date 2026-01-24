@@ -17,7 +17,19 @@ Repositório principal da aplicação Oficina Cardozo. Responsável pela API, l�
 4. Acompanhe logs e métricas via Datadog.
 
 ## Diagrama da Arquitetura
-<!-- Insira aqui o diagrama da arquitetura deste repositório quando disponível -->
+```mermaid
+flowchart LR
+    User[Usuário/Cliente]
+    APIGW[AWS API Gateway]
+    App[OficinaCardozo.API (EKS)]
+    DB[(Aurora)]
+    Datadog[Datadog]
+    User --> APIGW
+    APIGW --> App
+    App --> DB
+    App --> Datadog
+    Datadog -.-> App
+```
 
 ## Documentação da API
 - [Swagger Homologação](http://a85fc4063a2e04d7588978c9cc1e0527-1865379925.us-east-1.elb.amazonaws.com/swagger)

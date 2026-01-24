@@ -296,7 +296,7 @@ public class OrdemServicoService : IOrdemServicoService
         {
             var ordemServicoDetails = await _ordemServicoRepository.GetByIdWithDetailsAsync(ordemServicoId);
             if (ordemServicoDetails == null)
-                throw new KeyNotFoundException("Ordem de serviço não encontrada");
+                throw new KeyNotFoundException($"Ordem de serviço não encontrada (ID: {ordemServicoId})");
 
             var statusEmDiagnostico = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.EM_DIAGNOSTICO);
             if (statusEmDiagnostico == null)
@@ -307,11 +307,11 @@ public class OrdemServicoService : IOrdemServicoService
 
             var orcamento = ordemServicoDetails.Orcamentos?.FirstOrDefault();
             if (orcamento == null)
-                throw new InvalidOperationException("Nenhum orçamento encontrado para esta ordem de serviço");
+                throw new InvalidOperationException($"Nenhum orçamento encontrado para esta ordem de serviço (ID: {ordemServicoId})");
 
             var statusOrcamentoCriado = await _orcamentoStatusRepository.GetByDescricaoAsync(OrcamentoStatusConstants.CRIADO);
             if (orcamento.IdStatus != statusOrcamentoCriado?.Id)
-                throw new InvalidOperationException("Orçamento deve estar no status 'Criado' para finalizar diagnóstico");
+                throw new InvalidOperationException($"Orçamento deve estar no status 'Criado' para finalizar diagnóstico. Status atual: {orcamento.Status?.Descricao}");
 
             var statusEmElaboracao = await _ordemServicoStatusRepository.GetByDescricaoAsync(OrdemServicoStatusConstants.EM_ELABORACAO);
             if (statusEmElaboracao == null)
@@ -319,10 +319,15 @@ public class OrdemServicoService : IOrdemServicoService
 
             var ordemServicoParaUpdate = await _ordemServicoRepository.GetByIdAsync(ordemServicoId);
             if (ordemServicoParaUpdate == null)
-                throw new KeyNotFoundException("Ordem de serviço não encontrada para atualização");
+                throw new KeyNotFoundException($"Ordem de serviço não encontrada para atualização (ID: {ordemServicoId})");
 
             ordemServicoParaUpdate.IdStatus = statusEmElaboracao.Id;
             await _ordemServicoRepository.UpdateAsync(ordemServicoParaUpdate);
+
+            // LOG extra: buscar novamente a ordem após update
+            var ordemServicoAtualizada = await _ordemServicoRepository.GetByIdWithDetailsAsync(ordemServicoId);
+            var statusOrdemAtual = ordemServicoAtualizada?.Status?.Descricao;
+            Console.WriteLine($"[DEBUG] Ordem de serviço {ordemServicoId} status após update: {statusOrdemAtual}");
 
             var statusOrcamentoEmElaboracao = await _orcamentoStatusRepository.GetByDescricaoAsync(OrcamentoStatusConstants.EM_ELABORACAO);
             if (statusOrcamentoEmElaboracao != null)
@@ -331,24 +336,28 @@ public class OrdemServicoService : IOrdemServicoService
                 await _orcamentoRepository.UpdateAsync(orcamento);
             }
 
+            // Buscar o orçamento atualizado
+            var orcamentoAtualizado = await _orcamentoRepository.GetByIdWithDetailsAsync(orcamento.Id);
+
             var result = new OrcamentoResumoDto
             {
-                Id = orcamento.Id,
-                DataOrcamento = orcamento.DataOrcamento,
+                Id = orcamentoAtualizado?.Id ?? orcamento.Id,
+                DataOrcamento = orcamentoAtualizado?.DataOrcamento ?? orcamento.DataOrcamento,
                 StatusDescricao = "Orçamento Em elaboracao - Pronto para envio",
-                ClienteNome = ordemServicoDetails.Veiculo?.Cliente?.Nome ?? "",
-                ClienteEmail = ordemServicoDetails.Veiculo?.Cliente?.EmailPrincipal ?? "",
-                VeiculoPlaca = ordemServicoDetails.Veiculo?.Placa ?? "",
-                VeiculoMarcaModelo = ordemServicoDetails.Veiculo?.MarcaModelo ?? "",
-                ValorTotal = CalcularValorTotalOrcamento(orcamento),
+                ClienteNome = ordemServicoAtualizada?.Veiculo?.Cliente?.Nome ?? ordemServicoDetails.Veiculo?.Cliente?.Nome ?? "",
+                ClienteEmail = ordemServicoAtualizada?.Veiculo?.Cliente?.EmailPrincipal ?? ordemServicoDetails.Veiculo?.Cliente?.EmailPrincipal ?? "",
+                VeiculoPlaca = ordemServicoAtualizada?.Veiculo?.Placa ?? ordemServicoDetails.Veiculo?.Placa ?? "",
+                VeiculoMarcaModelo = ordemServicoAtualizada?.Veiculo?.MarcaModelo ?? ordemServicoDetails.Veiculo?.MarcaModelo ?? "",
+                ValorTotal = CalcularValorTotalOrcamento(orcamentoAtualizado ?? orcamento),
                 MensagemAprovacao = "Diagnóstico finalizado! Orçamento elaborado e pronto para ser enviado ao cliente."
             };
             stopwatch.Stop();
             StatsdClient.Metrics.Timer("oficinacardozo.ordem_servico.tempo_finalizar_diagnostico_ms", (int)stopwatch.ElapsedMilliseconds);
             return result;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Console.WriteLine($"[ERRO] FinalizarDiagnosticoAsync: {ex.Message}");
             StatsdClient.Metrics.Counter("ordem_servico.fail", 1);
             StatsdClient.Metrics.Counter("echo_teste.metric", 1);
             throw;

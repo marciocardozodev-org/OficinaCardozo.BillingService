@@ -43,6 +43,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: oficina-cardozo-config
+            - configMapRef:
+                name: datadog-config
             - secretRef:
                 name: oficina-cardozo-db-secret
             - secretRef:

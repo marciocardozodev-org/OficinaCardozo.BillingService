@@ -7,3 +7,5 @@ metadata:
 data:
   DATADOG_METRICS_URL: "https://api.datadoghq.com/api/v1/series"
   DATADOG_HOST: "oficina-cardozo-api"
+  STATSD_HOST: "localhost"
+  STATSD_PORT: "8125"

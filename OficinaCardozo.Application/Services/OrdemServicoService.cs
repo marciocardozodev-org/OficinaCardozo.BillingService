@@ -37,7 +37,7 @@ public interface IOrdemServicoService
 
 public class OrdemServicoService : IOrdemServicoService
 {
-    private static bool _metricsConfigured = false;
+    // ...existing code...
     private readonly IOrdemServicoRepository _ordemServicoRepository;
     private readonly IClienteRepository _clienteRepository;
     private readonly IVeiculoRepository _veiculoRepository;
@@ -66,25 +66,7 @@ public class OrdemServicoService : IOrdemServicoService
         _ordemServicoStatusRepository = ordemServicoStatusRepository;
         _orcamentoStatusRepository = orcamentoStatusRepository;
 
-        // Configura StatsdClient.Metrics apenas uma vez, com suporte a STATSD_HOST
-        if (!_metricsConfigured)
-        {
-            // Prioriza STATSD_HOST, senão detecta ambiente
-            var statsdHost = Environment.GetEnvironmentVariable("STATSD_HOST");
-            if (string.IsNullOrEmpty(statsdHost))
-            {
-                var isKubernetes = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST"));
-                statsdHost = isKubernetes
-                    ? "datadog-agent.default.svc.cluster.local"
-                    : "127.0.0.1";
-            }
-            StatsdClient.Metrics.Configure(new StatsdClient.MetricsConfig
-            {
-                StatsdServerName = statsdHost,
-                StatsdServerPort = 8125
-            });
-            _metricsConfigured = true;
-        }
+        // ...existing code...
     }
 
     public async Task<OrdemServicoDto> CreateOrdemServicoComOrcamentoAsync(CreateOrdemServicoDto createDto)
@@ -190,10 +172,7 @@ public class OrdemServicoService : IOrdemServicoService
                 ?? throw new InvalidOperationException("Erro ao recuperar ordem de Serviço criada com sucesso.");
 
             stopwatch.Stop();
-            // Métricas customizadas Datadog
-            StatsdClient.Metrics.Counter("oficinacardozo.ordem_servico.criada", 1);
-            StatsdClient.Metrics.Timer("oficinacardozo.ordem_servico.tempo_criacao_ms", (int)stopwatch.ElapsedMilliseconds);
-
+            // ...existing code...
             return result;
         }
         catch (Exception)

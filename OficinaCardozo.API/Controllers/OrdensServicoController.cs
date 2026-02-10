@@ -716,7 +716,7 @@ public class OrdensServicoController : ControllerBase
         {
             try
             {
-                throw new InvalidOperationException("Simulação de erro para monitoramento Datadog");
+                throw new InvalidOperationException("Simulação de erro para monitoramento");
             }
             catch (Exception ex)
             {

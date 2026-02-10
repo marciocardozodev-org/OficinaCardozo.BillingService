@@ -8,13 +8,13 @@ Repositório principal da aplicação Oficina Cardozo. Responsável pela API, l�
 - Docker
 - Kubernetes (EKS)
 - AWS Aurora
-- Datadog
+ 
 
 ## Passos para Execução e Deploy
 1. Clone o repositório.
 2. Configure as variáveis de ambiente e arquivos de configuração.
 3. Execute `docker-compose up` para ambiente local ou utilize os manifests do diretório k8s/ para deploy em EKS.
-4. Acompanhe logs e métricas via Datadog.
+4. Acompanhe logs e métricas via ferramentas de sua escolha.
 
 ## Diagrama da Arquitetura
 ```mermaid
@@ -23,12 +23,10 @@ flowchart LR
     APIGW[AWS API Gateway]
     App[OficinaCardozo.API EKS]
     DB[Aurora]
-    Datadog[Datadog]
     User --> APIGW
     APIGW --> App
     App --> DB
-    App --> Datadog
-    Datadog -.-> App
+    
 ```
 
 ## Documentação da API

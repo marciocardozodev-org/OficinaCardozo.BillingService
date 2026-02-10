@@ -75,18 +75,7 @@ Console.WriteLine($"[DIAG] ASPNETCORE_ENVIRONMENT: {Environment.GetEnvironmentVa
 try
 {
     // Serilog removido para teste de isolamento
-
-    // Configuração global do DogStatsD para métricas customizadas
-    StatsdClient.Metrics.Configure(new StatsdClient.MetricsConfig
-    {
-        StatsdServerName = "datadog-agent.default.svc.cluster.local",
-        StatsdServerPort = 8125
-    });
-    // Envia métrica de teste no startup global
-    StatsdClient.Metrics.Counter("echo_teste.metric", 1);
-
-    // Log removido (Serilog)
-
+    // ...existing code...
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.Configure<ConfiguracoesJwt>(builder.Configuration.GetSection("ConfiguracoesJwt"));
@@ -202,7 +191,7 @@ try
 
     // Middleware de latência do Datadog (deve vir após UseRouting e antes dos controllers)
     app.UseRouting();
-    app.UseMiddleware<OficinaCardozo.API.Middleware.DatadogLatencyMiddleware>();
+    // ...existing code...
 
     app.UseAuthentication();
     app.UseAuthorization();

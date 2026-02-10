@@ -104,7 +104,7 @@ jobs:
 
 
     
-        K8S_NAMESPACE_PROD: oficina-prod
+
 
 
     - name: Apply manifests to Kubernetes

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using OficinaCardozo.Application.Interfaces;
@@ -19,6 +20,7 @@ public class HealthController : ControllerBase
     }
 
     [HttpGet("live")]
+    [AllowAnonymous]
     public IActionResult Live()
     {
         _logger.LogInformation("[HealthController] Live endpoint chamado em {Time}", DateTime.UtcNow);

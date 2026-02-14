@@ -70,8 +70,8 @@ spec:
             failureThreshold: 5
       volumes:
         - name: cert-global-bundle-pe
-          secret:
-            secretName: cert-global-bundle-pe
+          configMap:
+            name: cert-global-bundle-pe
             items:
               - key: global-bundle.pe
                 path: global-bundle.pe

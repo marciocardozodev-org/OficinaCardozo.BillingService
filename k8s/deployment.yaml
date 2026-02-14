@@ -21,6 +21,10 @@ spec:
       annotations:
         
     spec:
+          volumeMounts:
+            - name: cert-global-bundle-pe
+              mountPath: /certs
+              readOnly: true
       containers:
         - name: api
           env:
@@ -64,6 +68,13 @@ spec:
             timeoutSeconds: 3
             periodSeconds: 10
             failureThreshold: 5
+      volumes:
+        - name: cert-global-bundle-pe
+          secret:
+            secretName: cert-global-bundle-pe
+            items:
+              - key: global-bundle.pe
+                path: global-bundle.pe
 ---
 # Namespace é definido externamente pelo pipeline (K8S_NAMESPACE_*)
 # Este Deployment assume que secrets/configmaps de conexão (DB, JWT, Email) serão

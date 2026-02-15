@@ -8,5 +8,11 @@ namespace OFICINACARDOZO.OSSERVICE.InfraDb
         public OsDbContext(DbContextOptions<OsDbContext> options) : base(options) { }
 
         public DbSet<OrdemDeServico> OrdensDeServico { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<OrdemDeServico>().ToTable("OFICINA_ORDEM_SERVICO");
+        }
     }
 }

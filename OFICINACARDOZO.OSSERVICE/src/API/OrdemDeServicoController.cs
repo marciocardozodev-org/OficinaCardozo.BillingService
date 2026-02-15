@@ -216,39 +216,6 @@ namespace OFICINACARDOZO.OSSERVICE.API
         ///     ]
         /// </remarks>
         /// <returns>Lista de OS</returns>
-        [HttpGet("status/{status}")]
-        [ProducesResponseType(typeof(IEnumerable<OrdemDeServico>), 200)]
-        public async Task<ActionResult<IEnumerable<OrdemDeServico>>> ListarPorStatus(StatusOrdemServico status)
-        {
-            var ordens = await _repository.GetByStatusAsync(status);
-            return Ok(ordens);
-        }
-
-        /// <summary>
-        /// Lista Ordens de Serviço por data de criação.
-        /// </summary>
-        /// <param name="data">Data no formato yyyy-MM-dd</param>
-        /// <remarks>
-        /// Exemplo de response:
-        ///
-        ///     [
-        ///         {
-        ///             "id": "guid",
-        ///             "descricao": "Troca de óleo do veículo X",
-        ///             "dataCriacao": "2026-02-15T12:00:00Z",
-        ///             "status": "Aberta"
-        ///         }
-        ///     ]
-        /// </remarks>
-        /// <returns>Lista de OS</returns>
-        [HttpGet("data/{data}")]
-        [ProducesResponseType(typeof(IEnumerable<OrdemDeServico>), 200)]
-        public async Task<ActionResult<IEnumerable<OrdemDeServico>>> ListarPorData(string data)
-        {
-            if (!DateTime.TryParse(data, out var dt))
-                return BadRequest(new { Erro = "Data inválida. Use yyyy-MM-dd." });
-            var ordens = await _repository.GetByDateAsync(dt);
-            return Ok(ordens);
-        }
+        // ...existing code...
     }
 }

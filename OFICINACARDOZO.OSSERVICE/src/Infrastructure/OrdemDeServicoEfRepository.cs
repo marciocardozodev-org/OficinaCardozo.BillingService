@@ -1,21 +1,3 @@
-        public async Task<bool> UpdateStatusAsync(Guid id, StatusOrdemServico novoStatus)
-        {
-            var ordem = await _context.OrdensDeServico.FindAsync(id);
-            if (ordem == null) return false;
-            ordem.Status = novoStatus;
-            await _context.SaveChangesAsync();
-            return true;
-        }
-
-        public async Task<List<OrdemDeServico>> GetByStatusAsync(StatusOrdemServico status)
-        {
-            return await _context.OrdensDeServico.Where(o => o.Status == status).ToListAsync();
-        }
-
-        public async Task<List<OrdemDeServico>> GetByDateAsync(DateTime data)
-        {
-            return await _context.OrdensDeServico.Where(o => o.DataCriacao.Date == data.Date).ToListAsync();
-        }
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -39,6 +21,25 @@ namespace OFICINACARDOZO.OSSERVICE.Infrastructure
             _context.OrdensDeServico.Add(ordem);
             await _context.SaveChangesAsync();
             return ordem;
+        }
+
+        public async Task<bool> UpdateStatusAsync(Guid id, StatusOrdemServico novoStatus)
+        {
+            var ordem = await _context.OrdensDeServico.FindAsync(id);
+            if (ordem == null) return false;
+            ordem.Status = novoStatus;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<List<OrdemDeServico>> GetByStatusAsync(StatusOrdemServico status)
+        {
+            return await _context.OrdensDeServico.Where(o => o.Status == status).ToListAsync();
+        }
+
+        public async Task<List<OrdemDeServico>> GetByDateAsync(DateTime data)
+        {
+            return await _context.OrdensDeServico.Where(o => o.DataCriacao.Date == data.Date).ToListAsync();
         }
 
         public async Task<List<OrdemDeServico>> GetAllAsync()

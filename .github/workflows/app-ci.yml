@@ -58,9 +58,9 @@ jobs:
           dotnet restore OficinaCardozo.Application/OficinaCardozo.Application.csproj --verbosity minimal
           dotnet restore OficinaCardozo.Domain/OficinaCardozo.Domain.csproj --verbosity minimal
           dotnet restore OficinaCardozo.Tests/OficinaCardozo.Tests.csproj --verbosity minimal
-            dotnet restore OFICINACARDOZO.OSSERVICE/OFICINACARDOZO.OSSERVICE.csproj --verbosity minimal
-            dotnet build OFICINACARDOZO.OSSERVICE/OFICINACARDOZO.OSSERVICE.csproj --no-restore --configuration Release --verbosity minimal
-            dotnet test OFICINACARDOZO.OSSERVICE/OFICINACARDOZO.OSSERVICE.csproj --no-build --configuration Release --verbosity minimal --logger "console;verbosity=minimal"
+          dotnet restore ./OFICINACARDOZO.OSSERVICE.csproj --verbosity minimal
+          dotnet build ./OFICINACARDOZO.OSSERVICE.csproj --no-restore --configuration Release --verbosity minimal
+          dotnet test ./OFICINACARDOZO.OSSERVICE.csproj --no-build --configuration Release --verbosity minimal --logger "console;verbosity=minimal"
 
     - name: Docker login
       if: env.DEPLOY_ENABLED == 'true'

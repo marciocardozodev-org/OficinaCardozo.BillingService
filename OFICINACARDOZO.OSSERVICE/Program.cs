@@ -1,6 +1,15 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.EntityFrameworkCore;
+using OFICINACARDOZO.OSSERVICE.InfraDb;
+using OFICINACARDOZO.OSSERVICE.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+
+var builder = WebApplication.CreateBuilder(args);
+
 // Configuração do JWT (chave de exemplo, troque para produção)
 var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY") ?? "chave-super-secreta-para-dev";
 builder.Services.AddAuthentication(options =>
@@ -19,14 +28,6 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
     };
 });
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.EntityFrameworkCore;
-using OFICINACARDOZO.OSSERVICE.InfraDb;
-using OFICINACARDOZO.OSSERVICE.Infrastructure;
-
-var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers(options =>
@@ -47,7 +48,7 @@ builder.Services.AddSwaggerGen(options =>
             Email = "contato@oficinacardozo.com"
         }
     });
-    options.EnableAnnotations();
+    // options.EnableAnnotations(); // Removido: método não existe
 });
 builder.Services.AddHealthChecks();
 

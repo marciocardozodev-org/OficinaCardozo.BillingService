@@ -25,7 +25,7 @@ jobs:
       - name: Publish
         run: dotnet publish -c Release -o ./publish
       - name: Exibir Dockerfile correto
-        run: cat OFICINACARDOZO.OSSERVICE/Dockerfile
+        run: cd OFICINACARDOZO.OSSERVICE && cat Dockerfile
       - name: Build Docker image
         run: docker build -t ${{ secrets.DOCKER_REGISTRY }}/oficinacardozo-osservice:${{ github.sha }} -f OFICINACARDOZO.OSSERVICE/Dockerfile OFICINACARDOZO.OSSERVICE
       - name: Login to Docker Registry

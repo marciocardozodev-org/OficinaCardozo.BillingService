@@ -52,9 +52,15 @@ builder.Services.AddSwaggerGen(options =>
 });
 builder.Services.AddHealthChecks();
 
-// Configuração do DbContext InMemory (ajuste para outro provedor se necessário)
+// Configuração do DbContext para PostgreSQL via variáveis de ambiente
+var dbHost = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
+var dbName = Environment.GetEnvironmentVariable("DB_NAME") ?? "oficina";
+var dbUser = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
+var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "postgres";
+var postgresConnectionString = $"Host={dbHost};Database={dbName};Username={dbUser};Password={dbPassword}";
+
 builder.Services.AddDbContext<OsDbContext>(options =>
-    options.UseInMemoryDatabase("OsDb"));
+    options.UseNpgsql(postgresConnectionString));
 
 // Repositório EF
 builder.Services.AddScoped<OrdemDeServicoEfRepository>();

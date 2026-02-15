@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: osservice
+  labels:
+    app: osservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: osservice
+  template:
+    metadata:
+      labels:
+        app: osservice
+    spec:
+      containers:
+        - name: osservice
+          image: marciocardozodev/oficinacardozo-osservice:latest
+          ports:
+            - containerPort: 80
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+          # Adicione variáveis de ambiente e configs conforme necessário

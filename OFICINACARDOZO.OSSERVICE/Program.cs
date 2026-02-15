@@ -57,7 +57,7 @@ var dbHost = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
 var dbName = Environment.GetEnvironmentVariable("DB_NAME") ?? "oficina";
 var dbUser = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
 var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "postgres";
-var postgresConnectionString = $"Host={dbHost};Database={dbName};Username={dbUser};Password={dbPassword}";
+var postgresConnectionString = $"Host={dbHost};Database={dbName};Username={dbUser};Password={dbPassword};sslmode=VerifyFull;Root Certificate=/etc/ssl/certs/global-bundle.pem";
 
 builder.Services.AddDbContext<OsDbContext>(options =>
     options.UseNpgsql(postgresConnectionString));

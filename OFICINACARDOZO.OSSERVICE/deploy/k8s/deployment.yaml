@@ -28,6 +28,14 @@ spec:
             secretKeyRef:
               name: osservice-secrets
               key: jwt-key
+        volumeMounts:
+        - name: cert-global-bundle-pe
+          mountPath: /etc/ssl/certs/global-bundle.pem
+          subPath: global-bundle.pem
+      volumes:
+      - name: cert-global-bundle-pe
+        configMap:
+          name: cert-global-bundle-pe
         readinessProbe:
           httpGet:
             path: /health

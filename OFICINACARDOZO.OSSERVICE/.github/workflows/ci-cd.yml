@@ -24,6 +24,8 @@ jobs:
         run: dotnet test --no-build --verbosity normal --filter FullyQualifiedName~OFICINACARDOZO.OSSERVICE.Tests
       - name: Publish
         run: dotnet publish -c Release -o ./publish
+      - name: Exibir diretório atual
+        run: pwd
       - name: Exibir Dockerfile correto
         run: cat Dockerfile
       - name: Build Docker image

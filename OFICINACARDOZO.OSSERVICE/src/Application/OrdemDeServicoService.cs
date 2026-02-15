@@ -9,9 +9,9 @@ namespace OFICINACARDOZO.OSSERVICE.Application
     {
         private readonly List<OrdemDeServico> _ordens = new();
 
-        public OrdemDeServico Criar(string descricao)
+        public OrdemDeServico Criar(DateTime dataSolicitacao, int idVeiculo, int idStatus)
         {
-            var ordem = new OrdemDeServico(descricao);
+            var ordem = new OrdemDeServico(dataSolicitacao, idVeiculo, idStatus);
             _ordens.Add(ordem);
             return ordem;
         }

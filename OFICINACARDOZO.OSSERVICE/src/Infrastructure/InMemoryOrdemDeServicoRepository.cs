@@ -19,7 +19,7 @@ namespace OFICINACARDOZO.OSSERVICE.Infrastructure
             return _ordens;
         }
 
-        public OrdemDeServico GetById(Guid id)
+        public OrdemDeServico GetById(int id)
         {
             return _ordens.FirstOrDefault(o => o.Id == id);
         }

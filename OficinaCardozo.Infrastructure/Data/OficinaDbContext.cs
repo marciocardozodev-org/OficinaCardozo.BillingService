@@ -76,34 +76,6 @@ namespace OficinaCardozo.Infrastructure.Data
             }
             else if (provider == "Npgsql.EntityFrameworkCore.PostgreSQL")
             {
-                // No Postgres, o schema atual usa colunas inteiras para datas.
-                // Para evitar overflow (integer out of range) ao gravar ticks (Int64),
-                // armazenamos datas como segundos desde UnixEpoch em um int (32 bits).
-                var dateTimeConverter = new ValueConverter<DateTime, int>(
-                    v => (int)(v.ToUniversalTime() - DateTime.UnixEpoch).TotalSeconds,
-                    v => DateTime.UnixEpoch.AddSeconds(v));
-
-                var nullableDateTimeConverter = new ValueConverter<DateTime?, int?>(
-                    v => v.HasValue ? (int?)(v.Value.ToUniversalTime() - DateTime.UnixEpoch).TotalSeconds : null,
-                    v => v.HasValue ? DateTime.UnixEpoch.AddSeconds(v.Value) : (DateTime?)null);
-
-                foreach (var entityType in modelBuilder.Model.GetEntityTypes())
-                {
-                    var properties = entityType.GetProperties().Where(p => p.ClrType == typeof(DateTime));
-                    foreach (var property in properties)
-                    {
-                        modelBuilder.Entity(entityType.Name).Property(property.Name)
-                            .HasConversion(dateTimeConverter);
-                    }
-
-                    var nullableProperties = entityType.GetProperties().Where(p => p.ClrType == typeof(DateTime?));
-                    foreach (var property in nullableProperties)
-                    {
-                        modelBuilder.Entity(entityType.Name).Property(property.Name)
-                            .HasConversion(nullableDateTimeConverter);
-                    }
-                }
-
                 // Tipos explícitos para colunas decimais principais no Postgres
                 modelBuilder.Entity<Servico>()
                     .Property(s => s.Preco)
@@ -120,6 +92,7 @@ namespace OficinaCardozo.Infrastructure.Data
                 modelBuilder.Entity<OrdemServicoPeca>()
                     .Property(osp => osp.ValorUnitario)
                     .HasColumnType("numeric(18,2)");
+                // Não aplicar conversão para datas, deixar EF mapear DateTime como TIMESTAMP
             }
             else
             {

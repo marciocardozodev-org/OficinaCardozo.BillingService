@@ -23,23 +23,23 @@ namespace OFICINACARDOZO.OSSERVICE.Infrastructure
             return ordem;
         }
 
-        public async Task<bool> UpdateStatusAsync(Guid id, StatusOrdemServico novoStatus)
+        public async Task<bool> UpdateStatusAsync(int id, int novoStatus)
         {
             var ordem = await _context.OrdensDeServico.FindAsync(id);
             if (ordem == null) return false;
-            ordem.Status = novoStatus;
+            ordem.IdStatus = novoStatus;
             await _context.SaveChangesAsync();
             return true;
         }
 
-        public async Task<List<OrdemDeServico>> GetByStatusAsync(StatusOrdemServico status)
+        public async Task<List<OrdemDeServico>> GetByStatusAsync(int status)
         {
-            return await _context.OrdensDeServico.Where(o => o.Status == status).ToListAsync();
+            return await _context.OrdensDeServico.Where(o => o.IdStatus == status).ToListAsync();
         }
 
         public async Task<List<OrdemDeServico>> GetByDateAsync(DateTime data)
         {
-            return await _context.OrdensDeServico.Where(o => o.DataCriacao.Date == data.Date).ToListAsync();
+            return await _context.OrdensDeServico.Where(o => o.DataSolicitacao.Date == data.Date).ToListAsync();
         }
 
         public async Task<List<OrdemDeServico>> GetAllAsync()
@@ -47,7 +47,7 @@ namespace OFICINACARDOZO.OSSERVICE.Infrastructure
             return await _context.OrdensDeServico.ToListAsync();
         }
 
-        public async Task<OrdemDeServico> GetByIdAsync(Guid id)
+        public async Task<OrdemDeServico> GetByIdAsync(int id)
         {
             return await _context.OrdensDeServico.FindAsync(id);
         }

@@ -12,22 +12,20 @@ namespace OFICINACARDOZO.OSSERVICE.Domain
 
     public class OrdemDeServico
     {
-        public Guid Id { get; set; }
-        public string Descricao { get; set; }
-        public DateTime DataCriacao { get; set; }
-        public StatusOrdemServico Status { get; set; }
+        public int Id { get; set; }
+        public DateTime DataSolicitacao { get; set; }
+        public int IdVeiculo { get; set; }
+        public int IdStatus { get; set; }
+        public DateTime? DataFinalizacao { get; set; }
+        public DateTime? DataEntrega { get; set; }
 
-        public OrdemDeServico(string descricao)
-        {
-            Id = Guid.NewGuid();
-            Descricao = descricao;
-            DataCriacao = DateTime.UtcNow;
-            Status = StatusOrdemServico.Aberta;
-        }
+        public OrdemDeServico() { }
 
-        public void AlterarStatus(StatusOrdemServico novoStatus)
+        public OrdemDeServico(DateTime dataSolicitacao, int idVeiculo, int idStatus)
         {
-            Status = novoStatus;
+            DataSolicitacao = dataSolicitacao;
+            IdVeiculo = idVeiculo;
+            IdStatus = idStatus;
         }
     }
 }

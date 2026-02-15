@@ -50,14 +50,13 @@ namespace OFICINACARDOZO.OSSERVICE.API
         [ProducesResponseType(typeof(OrdemDeServico), 201)]
         [ProducesResponseType(400)]
         [ProducesResponseType(500)]
-        public async Task<ActionResult<OrdemDeServico>> Criar([FromBody] string descricao)
+        public async Task<ActionResult<OrdemDeServico>> Criar([FromBody] OrdemDeServico ordem)
         {
-            if (string.IsNullOrWhiteSpace(descricao))
+            if (ordem == null)
             {
-                _logger.LogWarning("Tentativa de criar OS com descrição vazia.");
-                return BadRequest(new { Erro = "Descrição é obrigatória." });
+                _logger.LogWarning("Tentativa de criar OS com dados nulos.");
+                return BadRequest(new { Erro = "Dados obrigatórios." });
             }
-            var ordem = new OrdemDeServico(descricao);
             await _repository.AddAsync(ordem);
             _logger.LogInformation("Ordem de Serviço criada com ID {Id}", ordem.Id);
             return CreatedAtAction(nameof(ObterPorId), new { id = ordem.Id }, ordem);
@@ -101,7 +100,7 @@ namespace OFICINACARDOZO.OSSERVICE.API
         /// <returns>Lista de OS</returns>
         [HttpGet("status/{status}")]
         [ProducesResponseType(typeof(IEnumerable<OrdemDeServico>), 200)]
-        public async Task<ActionResult<IEnumerable<OrdemDeServico>>> ListarPorStatus(StatusOrdemServico status)
+        public async Task<ActionResult<IEnumerable<OrdemDeServico>>> ListarPorStatus(int status)
         {
             var ordens = await _repository.GetByStatusAsync(status);
             return Ok(ordens);
@@ -167,7 +166,7 @@ namespace OFICINACARDOZO.OSSERVICE.API
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(OrdemDeServico), 200)]
         [ProducesResponseType(404)]
-        public async Task<ActionResult<OrdemDeServico>> ObterPorId(Guid id)
+        public async Task<ActionResult<OrdemDeServico>> ObterPorId(int id)
         {
             var ordem = await _repository.GetByIdAsync(id);
             if (ordem == null) return NotFound();
@@ -191,7 +190,7 @@ namespace OFICINACARDOZO.OSSERVICE.API
         [HttpPatch("{id}/status")]
         [ProducesResponseType(204)]
         [ProducesResponseType(404)]
-        public async Task<IActionResult> AlterarStatus(Guid id, [FromBody] StatusOrdemServico novoStatus)
+        public async Task<IActionResult> AlterarStatus(int id, [FromBody] int novoStatus)
         {
             var ok = await _repository.UpdateStatusAsync(id, novoStatus);
             if (!ok) return NotFound();

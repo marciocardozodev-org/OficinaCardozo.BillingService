@@ -98,6 +98,19 @@ jobs:
         terraform plan -input=false -var="enable_db=true"
         terraform apply -auto-approve -input=false -var="enable_db=true"
 
+    - name: Executar Job de criação das tabelas no banco
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'
+      run: |
+        kubectl apply -f OFICINACARDOZO.OSSERVICE/deploy/k8s/create-db-job.yaml
+        kubectl wait --for=condition=complete --timeout=300s job/create-db-job -n default || {
+          echo 'Job não completou, coletando debug:'
+          kubectl describe job/create-db-job -n default || true
+          kubectl get pods -n default -l job-name=create-db-job || true
+          POD=$(kubectl get pods -n default -l job-name=create-db-job -o jsonpath='{.items[0].metadata.name}')
+          kubectl logs "$POD" -n default || true
+          exit 1
+        }
+
 
     - name: Gerar kubeconfig do EKS
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'

@@ -39,8 +39,7 @@ namespace OficinaCardozo.Infrastructure.Factories
             if (!string.IsNullOrEmpty(connectionString) && (connectionString.Contains("Host=") || connectionString.Contains("host=")))
             {
                 Console.WriteLine("[OficinaDbContextFactory] PROVIDER: PostgreSQL");
-                optionsBuilder.UseNpgsql(connectionString,
-                    npgsqlOptions => npgsqlOptions.MigrationsAssembly(typeof(OficinaDbContext).Assembly.FullName));
+                optionsBuilder.UseNpgsql(connectionString);
             }
             else if (environment == "Development")
             {
@@ -54,14 +53,12 @@ namespace OficinaCardozo.Infrastructure.Factories
                     csBuilder.Password = password;
                     connectionString = csBuilder.ConnectionString;
                 }
-                optionsBuilder.UseSqlServer(connectionString,
-                    sqlOptions => sqlOptions.MigrationsAssembly(typeof(OficinaDbContext).Assembly.FullName));
+                optionsBuilder.UseSqlServer(connectionString);
             }
             else
             {
                 Console.WriteLine("[OficinaDbContextFactory] PROVIDER: SQLite");
-                optionsBuilder.UseSqlite(connectionString,
-                    sqliteOptions => sqliteOptions.MigrationsAssembly(typeof(OficinaDbContext).Assembly.FullName));
+                optionsBuilder.UseSqlite(connectionString);
             }
             return new OficinaDbContext(optionsBuilder.Options);
         }

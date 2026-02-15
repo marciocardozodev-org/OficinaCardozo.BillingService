@@ -88,7 +88,7 @@ public abstract class IntegrationTestBase : IAsyncDisposable
 
     private async Task InitializeDatabaseAsync()
     {
-        await _context.Database.EnsureCreatedAsync();
+        // await _context.Database.EnsureCreatedAsync();
 
         // Garantir que os status essenciais existam sempre
         await SeedStatusDataAsync();

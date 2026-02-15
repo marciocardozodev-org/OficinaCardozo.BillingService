@@ -133,8 +133,7 @@ public class LambdaEntryPoint : APIGatewayHttpApiV2ProxyFunction
                         if (connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase))
                         {
                             Console.WriteLine("✅ Configurando o provedor de banco de dados para PostgreSQL (Lambda).");
-                            options.UseNpgsql(connectionString,
-                                npgsqlOptions => npgsqlOptions.MigrationsAssembly(typeof(OficinaDbContext).Assembly.FullName));
+                            options.UseNpgsql(connectionString);
                         }
                         else
                         {
@@ -151,8 +150,7 @@ public class LambdaEntryPoint : APIGatewayHttpApiV2ProxyFunction
                                 ? connectionString
                                 : $"Data Source={connectionString}";
 
-                            options.UseSqlite(sqliteConnectionString,
-                                sqliteOptions => sqliteOptions.MigrationsAssembly(typeof(OficinaDbContext).Assembly.FullName));
+                            options.UseSqlite(sqliteConnectionString);
                         }
                     }
                     else
@@ -260,7 +258,7 @@ public class LambdaEntryPoint : APIGatewayHttpApiV2ProxyFunction
                                         var dbContext = scope.ServiceProvider.GetRequiredService<OficinaDbContext>();
 
                                         Console.WriteLine("📦 Verificando/aplicando migrações pendentes do banco de dados...");
-                                        dbContext.Database.Migrate();
+                                        // dbContext.Database.Migrate() removido, migrations não são mais usadas
                                         Console.WriteLine("✅ Migrações aplicadas (ou já estavam em dia).");
 
                                         // Ajustes adicionais específicos para Postgres (identidade das PKs etc.)

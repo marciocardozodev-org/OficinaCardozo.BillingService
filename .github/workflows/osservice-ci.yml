@@ -58,10 +58,8 @@ jobs:
     # --- Provisionamento do Banco de Dados (Terraform) ---
     - name: Baixar outputs do InfraK8s
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'
-      uses: actions/download-artifact@v4
-      with:
-        name: terraform-outputs
-        path: ../
+      run: |
+        aws s3 cp s3://oficina-cardozo-shared-artifacts/terraform/terraform-outputs.json ../terraform-outputs.json
 
     - name: Extrair subnets privadas do outputs
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'

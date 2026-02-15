@@ -106,6 +106,14 @@ jobs:
         export AWS_REGION="sa-east-1"
         aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
 
+
+    - name: Criar/atualizar ConfigMap do certificado global-bundle.pem
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'
+      run: |
+        kubectl create configmap cert-global-bundle-pe \
+          --from-file=global-bundle.pem=global-bundle.pe \
+          -n default --dry-run=client -o yaml | kubectl apply -f -
+
     - name: Garantir secret oficina-cardozo-db-secret
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'
       env:

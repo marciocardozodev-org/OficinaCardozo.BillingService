@@ -128,4 +128,4 @@ jobs:
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'
       run: |
         kubectl apply -f OFICINACARDOZO.OSSERVICE/k8s/
-        kubectl rollout status deployment/osservice
+        kubectl rollout status deployment/osservice --timeout=10m

@@ -90,10 +90,10 @@ jobs:
     - name: Provisionar RDS PostgreSQL (Terraform)
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'
       working-directory: OFICINACARDOZO.OSSERVICE/infra/terraform
-        run: |
-          terraform init -input=false
-          terraform plan -input=false -var="enable_db=true" -var="db_subnet_ids=${{ env.db_subnet_ids }}"
-          terraform apply -auto-approve -input=false -var="enable_db=true" -var="db_subnet_ids=${{ env.db_subnet_ids }}"
+      run: |
+        terraform init -input=false
+        terraform plan -input=false -var="enable_db=true" -var="db_subnet_ids=${{ env.db_subnet_ids }}"
+        terraform apply -auto-approve -input=false -var="enable_db=true" -var="db_subnet_ids=${{ env.db_subnet_ids }}"
 
 
     - name: Gerar kubeconfig do EKS

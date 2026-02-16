@@ -1,31 +1,31 @@
-output "rds_host" {
-  value       = aws_db_instance.main.endpoint
-  description = "Endpoint do RDS PostgreSQL"
+output "osservice_rds_host" {
+  value       = aws_db_instance.osservice.endpoint
+  description = "Endpoint do RDS PostgreSQL do OSService"
 }
 
-output "rds_user" {
-  value       = var.db_username
-  description = "Usuário do RDS"
+output "osservice_rds_user" {
+  value       = var.osservice_db_username
+  description = "Usuário do RDS do OSService"
 }
 
-output "rds_password" {
-  value       = var.db_password
-  description = "Senha do RDS"
+output "osservice_rds_password" {
+  value       = var.osservice_db_password
+  description = "Senha do RDS do OSService"
   sensitive   = true
 }
 
-output "rds_db_name" {
-  value       = var.db_name
-  description = "Nome do banco no RDS"
+output "osservice_rds_db_name" {
+  value       = var.osservice_db_name
+  description = "Nome do banco do OSService no RDS"
 }
-output "db_subnet_ids" {
+output "osservice_db_subnet_ids" {
   value       = try(data.terraform_remote_state.eks.outputs.private_subnet_ids, [])
-  description = "Subnets privadas usadas pelo RDS (propagadas do EKS)"
+  description = "Subnets privadas usadas pelo RDS do OSService (propagadas do EKS)"
 }
 
-output "db_security_group_ids" {
+output "osservice_db_security_group_ids" {
   value       = try(data.terraform_remote_state.eks.outputs.eks_security_group_ids, [])
-  description = "Security Groups usados pelo RDS (propagados do EKS)"
+  description = "Security Groups usados pelo RDS do OSService (propagados do EKS)"
 }
 # Executa migrations EF Core após o RDS estar disponível
 terraform {
@@ -53,10 +53,50 @@ provider "aws" {
   region = var.aws_region
 }
 
-variable "aws_region" {
   description = "AWS region"
   type        = string
   default     = "sa-east-1"
+}
+
+variable "osservice_app_name" {
+  description = "Prefixo para nomear recursos do OSService."
+  type        = string
+  default     = "osservice"
+}
+
+variable "osservice_db_name" {
+  description = "Nome do banco de dados do OSService."
+  type        = string
+  default     = "oficinacardozo"
+}
+
+variable "osservice_db_username" {
+  description = "Usuário administrador do banco do OSService."
+  type        = string
+  default     = "osadmin"
+}
+
+variable "osservice_db_password" {
+  description = "Senha do banco do OSService."
+  type        = string
+  sensitive   = true
+  default     = ""
+  validation {
+    condition     = length(var.osservice_db_password) == 0 || length(var.osservice_db_password) >= 8
+    error_message = "Senha inválida. Requisitos: vazio (para testes) ou mínimo 8 caracteres."
+  }
+}
+
+variable "osservice_db_subnet_ids" {
+  description = "Lista de subnets privadas para o RDS do OSService."
+  type        = list(string)
+  default     = []
+}
+
+variable "osservice_db_security_group_ids" {
+  description = "Security Groups para o RDS do OSService."
+  type        = list(string)
+  default     = []
 }
 
 variable "enable_db" {

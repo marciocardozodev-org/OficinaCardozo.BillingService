@@ -3,8 +3,14 @@ name: CI/CD - BillingService
 on:
   push:
     branches: [ develop, homolog, master ]
+    paths:
+      - 'OFICINACARDOZO.BILLINGSERVICE/**'
+      - '.github/workflows/ci-cd.yml'
   pull_request:
     branches: [ develop, homolog, master ]
+    paths:
+      - 'OFICINACARDOZO.BILLINGSERVICE/**'
+      - '.github/workflows/ci-cd.yml'
 
 jobs:
   build-test-deploy:

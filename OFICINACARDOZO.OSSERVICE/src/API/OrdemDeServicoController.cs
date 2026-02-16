@@ -1,4 +1,3 @@
-        
 using Microsoft.AspNetCore.Mvc;
 using OFICINACARDOZO.OSSERVICE.Domain;
 using OFICINACARDOZO.OSSERVICE.Infrastructure;
@@ -50,14 +49,13 @@ namespace OFICINACARDOZO.OSSERVICE.API
         [ProducesResponseType(typeof(OrdemDeServico), 201)]
         [ProducesResponseType(400)]
         [ProducesResponseType(500)]
-        public async Task<ActionResult<OrdemDeServico>> Criar([FromBody] string descricao)
+        public async Task<ActionResult<OrdemDeServico>> Criar([FromBody] OrdemDeServico ordem)
         {
-            if (string.IsNullOrWhiteSpace(descricao))
+            if (ordem == null)
             {
-                _logger.LogWarning("Tentativa de criar OS com descrição vazia.");
-                return BadRequest(new { Erro = "Descrição é obrigatória." });
+                _logger.LogWarning("Tentativa de criar OS com dados nulos.");
+                return BadRequest(new { Erro = "Dados obrigatórios." });
             }
-            var ordem = new OrdemDeServico(descricao);
             await _repository.AddAsync(ordem);
             _logger.LogInformation("Ordem de Serviço criada com ID {Id}", ordem.Id);
             return CreatedAtAction(nameof(ObterPorId), new { id = ordem.Id }, ordem);
@@ -101,7 +99,7 @@ namespace OFICINACARDOZO.OSSERVICE.API
         /// <returns>Lista de OS</returns>
         [HttpGet("status/{status}")]
         [ProducesResponseType(typeof(IEnumerable<OrdemDeServico>), 200)]
-        public async Task<ActionResult<IEnumerable<OrdemDeServico>>> ListarPorStatus(StatusOrdemServico status)
+        public async Task<ActionResult<IEnumerable<OrdemDeServico>>> ListarPorStatus(int status)
         {
             var ordens = await _repository.GetByStatusAsync(status);
             return Ok(ordens);
@@ -167,7 +165,7 @@ namespace OFICINACARDOZO.OSSERVICE.API
         [HttpGet("{id}")]
         [ProducesResponseType(typeof(OrdemDeServico), 200)]
         [ProducesResponseType(404)]
-        public async Task<ActionResult<OrdemDeServico>> ObterPorId(Guid id)
+        public async Task<ActionResult<OrdemDeServico>> ObterPorId(int id)
         {
             var ordem = await _repository.GetByIdAsync(id);
             if (ordem == null) return NotFound();
@@ -191,7 +189,7 @@ namespace OFICINACARDOZO.OSSERVICE.API
         [HttpPatch("{id}/status")]
         [ProducesResponseType(204)]
         [ProducesResponseType(404)]
-        public async Task<IActionResult> AlterarStatus(Guid id, [FromBody] StatusOrdemServico novoStatus)
+        public async Task<IActionResult> AlterarStatus(int id, [FromBody] int novoStatus)
         {
             var ok = await _repository.UpdateStatusAsync(id, novoStatus);
             if (!ok) return NotFound();
@@ -200,55 +198,17 @@ namespace OFICINACARDOZO.OSSERVICE.API
         }
 
         /// <summary>
-        /// Lista Ordens de Serviço por status.
+        /// Consulta o histórico de status de uma Ordem de Serviço.
         /// </summary>
-        /// <param name="status">Status desejado (Aberta, EmAndamento, Finalizada, Cancelada)</param>
-        /// <remarks>
-        /// Exemplo de response:
-        ///
-        ///     [
-        ///         {
-        ///             "id": "guid",
-        ///             "descricao": "Troca de óleo do veículo X",
-        ///             "dataCriacao": "2026-02-15T12:00:00Z",
-        ///             "status": "Finalizada"
-        ///         }
-        ///     ]
-        /// </remarks>
-        /// <returns>Lista de OS</returns>
-        [HttpGet("status/{status}")]
-        [ProducesResponseType(typeof(IEnumerable<OrdemDeServico>), 200)]
-        public async Task<ActionResult<IEnumerable<OrdemDeServico>>> ListarPorStatus(StatusOrdemServico status)
+        /// <param name="id">ID da OS</param>
+        /// <returns>Lista de status e datas</returns>
+        [HttpGet("{id}/historico")]
+        [ProducesResponseType(typeof(IEnumerable<OrdemDeServicoHistorico>), 200)]
+        public async Task<ActionResult<IEnumerable<OrdemDeServicoHistorico>>> Historico(int id)
         {
-            var ordens = await _repository.GetByStatusAsync(status);
-            return Ok(ordens);
-        }
-
-        /// <summary>
-        /// Lista Ordens de Serviço por data de criação.
-        /// </summary>
-        /// <param name="data">Data no formato yyyy-MM-dd</param>
-        /// <remarks>
-        /// Exemplo de response:
-        ///
-        ///     [
-        ///         {
-        ///             "id": "guid",
-        ///             "descricao": "Troca de óleo do veículo X",
-        ///             "dataCriacao": "2026-02-15T12:00:00Z",
-        ///             "status": "Aberta"
-        ///         }
-        ///     ]
-        /// </remarks>
-        /// <returns>Lista de OS</returns>
-        [HttpGet("data/{data}")]
-        [ProducesResponseType(typeof(IEnumerable<OrdemDeServico>), 200)]
-        public async Task<ActionResult<IEnumerable<OrdemDeServico>>> ListarPorData(string data)
-        {
-            if (!DateTime.TryParse(data, out var dt))
-                return BadRequest(new { Erro = "Data inválida. Use yyyy-MM-dd." });
-            var ordens = await _repository.GetByDateAsync(dt);
-            return Ok(ordens);
+            var historico = await _repository.GetHistoricoAsync(id);
+            if (historico == null || !historico.Any()) return NotFound();
+            return Ok(historico);
         }
     }
 }

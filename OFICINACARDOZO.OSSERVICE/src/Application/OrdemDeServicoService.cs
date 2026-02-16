@@ -1,4 +1,4 @@
-// Alteração de teste para validação do fluxo gitflow (develop -> homolog -> master)
+// Alteração de teste para validação do fluxo gitflow (develop -> homolog -> main)
 using System;
 using System.Collections.Generic;
 using OFICINACARDOZO.OSSERVICE.Domain;
@@ -9,9 +9,9 @@ namespace OFICINACARDOZO.OSSERVICE.Application
     {
         private readonly List<OrdemDeServico> _ordens = new();
 
-        public OrdemDeServico Criar(string descricao)
+        public OrdemDeServico Criar(DateTime dataSolicitacao, int idVeiculo, int idStatus)
         {
-            var ordem = new OrdemDeServico(descricao);
+            var ordem = new OrdemDeServico(dataSolicitacao, idVeiculo, idStatus);
             _ordens.Add(ordem);
             return ordem;
         }

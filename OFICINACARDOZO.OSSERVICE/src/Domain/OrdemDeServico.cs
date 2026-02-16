@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using System;
 
 namespace OFICINACARDOZO.OSSERVICE.Domain
@@ -10,24 +11,34 @@ namespace OFICINACARDOZO.OSSERVICE.Domain
         Cancelada
     }
 
+    [Table("OFICINA_ORDEM_SERVICO")]
     public class OrdemDeServico
     {
-        public Guid Id { get; set; }
-        public string Descricao { get; set; }
-        public DateTime DataCriacao { get; set; }
-        public StatusOrdemServico Status { get; set; }
+        [Column("ID")]
+        public int Id { get; set; }
 
-        public OrdemDeServico(string descricao)
-        {
-            Id = Guid.NewGuid();
-            Descricao = descricao;
-            DataCriacao = DateTime.UtcNow;
-            Status = StatusOrdemServico.Aberta;
-        }
+        [Column("DATA_SOLICITACAO")]
+        public DateTime DataSolicitacao { get; set; }
 
-        public void AlterarStatus(StatusOrdemServico novoStatus)
+        [Column("ID_VEICULO")]
+        public int IdVeiculo { get; set; }
+
+        [Column("ID_STATUS")]
+        public int IdStatus { get; set; }
+
+        [Column("DATA_FINALIZACAO")]
+        public DateTime? DataFinalizacao { get; set; }
+
+        [Column("DATA_ENTREGA")]
+        public DateTime? DataEntrega { get; set; }
+
+        public OrdemDeServico() { }
+
+        public OrdemDeServico(DateTime dataSolicitacao, int idVeiculo, int idStatus)
         {
-            Status = novoStatus;
+            DataSolicitacao = dataSolicitacao;
+            IdVeiculo = idVeiculo;
+            IdStatus = idStatus;
         }
     }
 }

@@ -1,32 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: osservice
+  name: billingservice
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: osservice
+      app: billingservice
   template:
     metadata:
       labels:
-        app: osservice
+        app: billingservice
     spec:
       containers:
-      - name: osservice
-        image: marciocardozodev/oficinacardozo-osservice:${IMAGE_TAG}
+      - name: billingservice
+        image: marciocardozodev/oficinacardozo-billingservice:${IMAGE_TAG}
         ports:
         - containerPort: 80
         env:
         - name: ASPNETCORE_ENVIRONMENT
           valueFrom:
             configMapKeyRef:
-              name: osservice-config
+              name: billingservice-config
               key: ASPNETCORE_ENVIRONMENT
         - name: JWT_KEY
           valueFrom:
             secretKeyRef:
-              name: osservice-secrets
+              name: billingservice-secrets
               key: jwt-key
         - name: DB_HOST
           valueFrom:

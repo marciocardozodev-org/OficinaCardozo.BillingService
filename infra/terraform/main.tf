@@ -1,31 +1,31 @@
-output "rds_host" {
-  value       = aws_db_instance.main.endpoint
-  description = "Endpoint do RDS PostgreSQL"
+output "billingservice_rds_host" {
+  value       = aws_db_instance.billingservice.endpoint
+  description = "Endpoint do RDS PostgreSQL do BillingService"
 }
 
-output "rds_user" {
-  value       = var.db_username
-  description = "Usuário do RDS"
+output "billingservice_rds_user" {
+  value       = var.billingservice_db_username
+  description = "Usuário do RDS do BillingService"
 }
 
-output "rds_password" {
-  value       = var.db_password
-  description = "Senha do RDS"
+output "billingservice_rds_password" {
+  value       = var.billingservice_db_password
+  description = "Senha do RDS do BillingService"
   sensitive   = true
 }
 
-output "rds_db_name" {
-  value       = var.db_name
-  description = "Nome do banco no RDS"
+output "billingservice_rds_db_name" {
+  value       = var.billingservice_db_name
+  description = "Nome do banco do BillingService no RDS"
 }
-output "db_subnet_ids" {
+output "billingservice_db_subnet_ids" {
   value       = try(data.terraform_remote_state.eks.outputs.private_subnet_ids, [])
-  description = "Subnets privadas usadas pelo RDS (propagadas do EKS)"
+  description = "Subnets privadas usadas pelo RDS do BillingService (propagadas do EKS)"
 }
 
-output "db_security_group_ids" {
+output "billingservice_db_security_group_ids" {
   value       = try(data.terraform_remote_state.eks.outputs.eks_security_group_ids, [])
-  description = "Security Groups usados pelo RDS (propagados do EKS)"
+  description = "Security Groups usados pelo RDS do BillingService (propagados do EKS)"
 }
 # Executa migrations EF Core após o RDS estar disponível
 terraform {
@@ -53,10 +53,50 @@ provider "aws" {
   region = var.aws_region
 }
 
-variable "aws_region" {
   description = "AWS region"
   type        = string
   default     = "sa-east-1"
+}
+
+variable "billingservice_app_name" {
+  description = "Prefixo para nomear recursos do BillingService."
+  type        = string
+  default     = "billingservice"
+}
+
+variable "billingservice_db_name" {
+  description = "Nome do banco de dados do BillingService."
+  type        = string
+  default     = "billingservice"
+}
+
+variable "billingservice_db_username" {
+  description = "Usuário administrador do banco do BillingService."
+  type        = string
+  default     = "billingadmin"
+}
+
+variable "billingservice_db_password" {
+  description = "Senha do banco do BillingService."
+  type        = string
+  sensitive   = true
+  default     = ""
+  validation {
+    condition     = length(var.billingservice_db_password) == 0 || length(var.billingservice_db_password) >= 8
+    error_message = "Senha inválida. Requisitos: vazio (para testes) ou mínimo 8 caracteres."
+  }
+}
+
+variable "billingservice_db_subnet_ids" {
+  description = "Lista de subnets privadas para o RDS do BillingService."
+  type        = list(string)
+  default     = []
+}
+
+variable "billingservice_db_security_group_ids" {
+  description = "Security Groups para o RDS do BillingService."
+  type        = list(string)
+  default     = []
 }
 
 variable "enable_db" {
@@ -99,7 +139,7 @@ variable "db_subnet_ids" {
 variable "db_name" {
   description = "Nome do banco de dados a ser criado no RDS."
   type        = string
-  default     = "oficinacardozo"
+  default     = "billingservice"
 }
 
 variable "db_security_group_ids" {

@@ -1,3 +1,8 @@
+variable "billingservice_rds_instance_id" {
+  description = "Identificador único da instância RDS do BillingService."
+  type        = string
+  default     = "billingservice-rds"
+}
 output "billingservice_rds_host" {
   value       = aws_db_instance.billingservice.endpoint
   description = "Endpoint do RDS PostgreSQL do BillingService"

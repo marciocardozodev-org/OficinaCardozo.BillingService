@@ -1,6 +1,7 @@
+
 # Infraestrutura - Terraform (RDS)
 
-Esta pasta contém os arquivos Terraform necessários para provisionar o banco de dados RDS PostgreSQL do OSService.
+Esta pasta contém os arquivos Terraform necessários para provisionar o banco de dados RDS PostgreSQL do BillingService.
 
 ## Origem
 - Baseado no repositório: https://github.com/marciocardozodev-org/OficinaCardozo.InfraDB.git

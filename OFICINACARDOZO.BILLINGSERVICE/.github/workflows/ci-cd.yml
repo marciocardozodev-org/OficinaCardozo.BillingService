@@ -23,6 +23,11 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Limpar arquivos antigos do OSSERVICE
+      run: rm -rf OFICINACARDOZO.BILLINGSERVICE/obj/OFICINACARDOZO.OSSERVICE* OFICINACARDOZO.BILLINGSERVICE/obj/Release/net8.0/OFICINACARDOZO.OSSERVICE* || true
+      shell: bash
+      continue-on-error: true
+    
     - name: Exibir Dockerfile usado no build
       run: cat OFICINACARDOZO.BILLINGSERVICE/Dockerfile
 

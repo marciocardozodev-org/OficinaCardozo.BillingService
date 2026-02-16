@@ -1,3 +1,4 @@
+# Teste de pipeline: alteração para validar CI/CD e gitflow
 
 # OficinaCardozo Billing Service
 

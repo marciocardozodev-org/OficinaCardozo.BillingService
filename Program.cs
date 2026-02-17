@@ -49,6 +49,8 @@ builder.Services.AddSwaggerGen(options =>
     });
     // options.EnableAnnotations(); // Removido: método não existe
 });
+ builder.Services.AddScoped<PagamentoService>();
+ builder.Services.AddScoped<AtualizacaoStatusOsService>();
 builder.Services.AddHealthChecks();
 
 // Configuração do DbContext para PostgreSQL via variáveis de ambiente

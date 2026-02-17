@@ -14,9 +14,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-            modelBuilder.Entity<Orcamento>().ToTable("orcamento");
-            modelBuilder.Entity<Pagamento>().ToTable("pagamento");
-            modelBuilder.Entity<AtualizacaoStatusOs>().ToTable("atualizacao_status_os");
+            // Mapeamento de tabelas removido: agora feito por data annotations nas models
         }
     }
 }

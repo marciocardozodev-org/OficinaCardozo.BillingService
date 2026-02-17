@@ -92,6 +92,9 @@ Este microserviço implementa a gestão de faturamento (Billing) seguindo arquit
 ## Documentação da API
 - Acesse `/swagger` após subir o serviço para explorar e testar os endpoints.
 
----
+## Exemplos de eventos
+Veja src/API/Billing/ExamplesEvents.md
 
-> Dúvidas? Abra uma issue ou consulte os comentários XML nos controllers para detalhes dos endpoints.
+## Testes
+- Handlers de evento OsCreated, aprovação, processamento de webhook.
+- Mocks Mercado Pago e mensageria.

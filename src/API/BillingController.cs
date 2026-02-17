@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using OFICINACARDOZO.BILLINGSERVICE.Application;
 
 namespace OFICINACARDOZO.BILLINGSERVICE.API
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class BillingController : ControllerBase
     {
         private readonly OrcamentoService _orcamentoService = new();

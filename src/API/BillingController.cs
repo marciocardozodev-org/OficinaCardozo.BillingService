@@ -7,11 +7,19 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
+
     public class BillingController : ControllerBase
     {
-        private readonly OrcamentoService _orcamentoService = new();
-        private readonly PagamentoService _pagamentoService = new();
-        private readonly AtualizacaoStatusOsService _statusOsService = new();
+        private readonly OrcamentoService _orcamentoService;
+        private readonly PagamentoService _pagamentoService;
+        private readonly AtualizacaoStatusOsService _statusOsService;
+
+        public BillingController(OrcamentoService orcamentoService, PagamentoService pagamentoService, AtualizacaoStatusOsService statusOsService)
+        {
+            _orcamentoService = orcamentoService;
+            _pagamentoService = pagamentoService;
+            _statusOsService = statusOsService;
+        }
 
         [HttpPost("orcamento")]
         public IActionResult GerarOrcamento([FromBody] OrcamentoRequestDto dto)

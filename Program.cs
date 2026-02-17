@@ -51,6 +51,8 @@ builder.Services.AddSwaggerGen(options =>
 });
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.PagamentoService>();
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.AtualizacaoStatusOsService>();
+builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.OrcamentoService>();
+builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.ServiceOrchestrator>();
 builder.Services.AddHealthChecks();
 
 // Configuração do DbContext para PostgreSQL via variáveis de ambiente

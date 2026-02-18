@@ -50,7 +50,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                         MessageAttributeNames = new List<string> { "All" }
                     }, stoppingToken);
 
-                    if (response.Messages.Count == 0)
+                    if (response?.Messages == null || response.Messages.Count == 0)
                     {
                         await Task.Delay(_pollingIntervalMs, stoppingToken);
                         continue;
@@ -66,6 +66,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Erro no SqsEventConsumerHostedService");
+                    await Task.Delay(1000, stoppingToken);
                 }
             }
         }
@@ -77,35 +78,61 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                 using var document = JsonDocument.Parse(message.Body);
                 var root = document.RootElement;
 
-                if (!root.TryGetProperty("Message", out var payloadElement))
+                // Log da estrutura da mensagem para debugging
+                _logger.LogInformation($"→ Estrutura da mensagem: {document}");
+
+                // Verificar se é um envelope SNS (publicado por SNS em SQS)
+                if (!root.TryGetProperty("Message", out var messageElement))
                 {
-                    _logger.LogWarning("Mensagem SQS sem campo 'Message'. Ignorando.");
+                    _logger.LogWarning("✗ Mensagem SQS sem campo 'Message' (não é envelope SNS)");
                     return;
                 }
 
-                if (!root.TryGetProperty("MessageAttributes", out var attributesElement))
+                var payload = messageElement.GetString() ?? string.Empty;
+                
+                // Tentar extrair attributes do SNS MessageAttributes (no envelope SNS)
+                string? eventType = null;
+                string? correlationId = null;
+                string? causationId = null;
+
+                if (root.TryGetProperty("MessageAttributes", out var attributesElement))
                 {
-                    _logger.LogWarning("Mensagem SQS sem 'MessageAttributes'. Ignorando.");
-                    return;
+                    _logger.LogInformation($"→ Encontrados MessageAttributes no envelope SNS");
+                    eventType = ExtractSnsAttribute(attributesElement, "EventType");
+                    correlationId = ExtractSnsAttribute(attributesElement, "CorrelationId");
+                    causationId = ExtractSnsAttribute(attributesElement, "CausationId");
                 }
 
-                var eventType = GetAttributeValue(attributesElement, "EventType");
-                var correlationId = GetAttributeValue(attributesElement, "CorrelationId");
-                var causationId = GetAttributeValue(attributesElement, "CausationId");
+                // Se não encontrou no envelope SNS, tentar nos attributes do SQS (message.MessageAttributes)
+                if (string.IsNullOrWhiteSpace(eventType) && message.MessageAttributes!=null && message.MessageAttributes.Count > 0)
+                {
+                    _logger.LogInformation($"→ Tentando extrair de SQS MessageAttributes");
+                    if (message.MessageAttributes.TryGetValue("EventType", out var attr))
+                    {
+                        eventType = attr.StringValue;
+                    }
+                    if (message.MessageAttributes.TryGetValue("CorrelationId", out var corrAttr))
+                    {
+                        correlationId = corrAttr.StringValue;
+                    }
+                    if (message.MessageAttributes.TryGetValue("CausationId", out var causAttr))
+                    {
+                        causationId = causAttr.StringValue;
+                    }
+                }
 
                 if (string.IsNullOrWhiteSpace(eventType))
                 {
-                    _logger.LogWarning("Mensagem SQS sem EventType. Ignorando.");
+                    _logger.LogWarning("✗ EventType não encontrado em nenhuma fonte. Deletando mensagem.");
+                    await _sqs.DeleteMessageAsync(_queueUrl, message.ReceiptHandle, stoppingToken);
                     return;
                 }
 
-                var payload = payloadElement.GetString() ?? string.Empty;
-
-                _logger.LogInformation($"→ Processando evento: {eventType} (CorrelationId: {correlationId})");
+                _logger.LogInformation($"✓ Evento extraído: Type={eventType}, CorrelationId={correlationId}");
 
                 using var scope = _serviceProvider.CreateScope();
                 var consumer = scope.ServiceProvider.GetRequiredService<IEventConsumer>();
-                await consumer.ConsumeAsync(eventType, payload, correlationId, causationId);
+                await consumer.ConsumeAsync(eventType, payload, correlationId ?? string.Empty, causationId ?? string.Empty);
 
                 _logger.LogInformation($"✓ Evento {eventType} processado com sucesso");
 
@@ -117,19 +144,21 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
             }
         }
 
-        private static string GetAttributeValue(JsonElement attributesElement, string key)
+        private static string? ExtractSnsAttribute(JsonElement attributesElement, string key)
         {
             if (!attributesElement.TryGetProperty(key, out var attribute))
             {
-                return string.Empty;
+                return null;
             }
 
-            if (!attribute.TryGetProperty("Value", out var valueElement))
+            // SNS MessageAttributes estrutura: { "Value": "...", "Type": "String|Number" }
+            if (attribute.TryGetProperty("Value", out var valueElement))
             {
-                return string.Empty;
+                return valueElement.GetString();
             }
 
-            return valueElement.GetString() ?? string.Empty;
+            // Tenta ler direto como string também
+            return attribute.GetString();
         }
     }
 }

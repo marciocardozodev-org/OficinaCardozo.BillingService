@@ -93,12 +93,13 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
                     {
                         await PublishOutboxMessageAsync(message, snsClient, snsTopics, stoppingToken);
 
-                        // 3. Marcar como publicado
-                        message.Published = true;
-                        message.PublishedAt = DateTime.UtcNow;
-                        dbContext.Update(message);
-
-                        await dbContext.SaveChangesAsync(stoppingToken);
+                        // 3. Marcar como publicado sem regravar DateTime Unspecified
+                        var publishedAtUtc = DateTime.UtcNow;
+                        await dbContext.OutboxMessages
+                            .Where(m => m.Id == message.Id)
+                            .ExecuteUpdateAsync(s => s
+                                .SetProperty(m => m.Published, true)
+                                .SetProperty(m => m.PublishedAt, publishedAtUtc), stoppingToken);
 
                         _logger.LogInformation(
                             "✅ OutboxMessage {MessageId} ({EventType}) publicada com sucesso. CorrelationId: {CorrelationId}",

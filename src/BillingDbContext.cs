@@ -83,7 +83,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE
                 entity.HasIndex(e => e.OsId);
                 entity.HasIndex(e => e.OrcamentoId);
                 entity.HasIndex(e => e.CorrelationId);
-                entity.HasOne(typeof(Orcamento))
+                entity.HasOne<Orcamento>()
                     .WithMany()
                     .HasForeignKey(e => e.OrcamentoId)
                     .OnDelete(DeleteBehavior.Cascade);

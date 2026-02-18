@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: billingservice
-        image: marciocardozodev/oficinacardozo-billingservice:${IMAGE_TAG}
+        image: marciocardozodev/oficinacardozo-billingservice:c9be75a871cbcf202433233620f7c43e6a3e48e3
         ports:
         - containerPort: 80
         env:
@@ -31,22 +31,22 @@ spec:
         - name: DB_HOST
           valueFrom:
             secretKeyRef:
-              name: oficina-cardozo-db-secret
+              name: billingservice-db-secret
               key: DB_HOST
         - name: DB_USER
           valueFrom:
             secretKeyRef:
-              name: oficina-cardozo-db-secret
+              name: billingservice-db-secret
               key: DB_USER
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: oficina-cardozo-db-secret
+              name: billingservice-db-secret
               key: DB_PASSWORD
         - name: DB_NAME
           valueFrom:
             secretKeyRef:
-              name: oficina-cardozo-db-secret
+              name: billingservice-db-secret
               key: DB_NAME
         # AWS Messaging Configuration
         - name: AWS_ACCESS_KEY_ID

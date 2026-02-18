@@ -46,8 +46,9 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 throw new InvalidOperationException($"Orçamento deve estar em status 'Enviado' para ser aprovado. Status atual: {orcamento.Status}");
 
             // Atualizar status do orçamento
+            var approvedAt = DateTime.UtcNow;
             orcamento.Status = StatusOrcamento.Aprovado;
-            orcamento.AtualizadoEm = DateTime.UtcNow;
+            orcamento.AtualizadoEm = approvedAt;
 
             // Propagar correlation_id se não fornecido
             var correlation = correlationId ?? orcamento.CorrelationId;
@@ -60,7 +61,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 OsId = orcamento.OsId,
                 Valor = orcamento.Valor,
                 Status = "Aprovado",
-                ApprovedAt = DateTime.UtcNow,
+                ApprovedAt = approvedAt,
                 CorrelationId = correlation,
                 CausationId = causation
             };
@@ -72,7 +73,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 Payload = JsonSerializer.Serialize(budgetApprovedEvent),
                 CorrelationId = correlation,
                 CausationId = causation,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = approvedAt,
                 Published = false
             };
 

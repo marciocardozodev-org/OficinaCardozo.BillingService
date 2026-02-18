@@ -117,10 +117,7 @@ var dbUser = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
 var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "postgres";
 var postgresConnectionString = $"Host={dbHost};Database={dbName};Username={dbUser};Password={dbPassword};sslmode=Require";
 builder.Services.AddDbContext<BillingDbContext>(options =>
-    options.UseNpgsql(postgresConnectionString, npgsqlOptions => 
-    {
-        npgsqlOptions.EnableRetryOnFailure(maxRetryCount: 3, TimeSpan.FromSeconds(5));
-    }));
+    options.UseNpgsql(postgresConnectionString));
 
 var app = builder.Build();
 

@@ -8,6 +8,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+
+// Configure AppContext for Npgsql DateTime handling
+AppContext.SetSwitch("Npgsql.DisableDateTimeInfinityConversions", true);
 using Amazon.SQS;
 using Amazon.SimpleNotificationService;
 using Amazon.Runtime;
@@ -114,7 +117,10 @@ var dbUser = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
 var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "postgres";
 var postgresConnectionString = $"Host={dbHost};Database={dbName};Username={dbUser};Password={dbPassword};sslmode=Require";
 builder.Services.AddDbContext<BillingDbContext>(options =>
-    options.UseNpgsql(postgresConnectionString));
+    options.UseNpgsql(postgresConnectionString, npgsqlOptions => 
+    {
+        npgsqlOptions.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelaySeconds: 5);
+    }));
 
 var app = builder.Build();
 

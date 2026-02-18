@@ -64,7 +64,6 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                 // 3. Criar OutboxMessage (NÃO PUBLICAMOS AGORA)
                 var outboxMessage = new OutboxMessage
                 {
-                    Id = Guid.NewGuid(),
                     EventType = nameof(BudgetGenerated),
                     Payload = JsonSerializer.Serialize(budgetGenerated),
                     CreatedAt = DateTime.UtcNow,

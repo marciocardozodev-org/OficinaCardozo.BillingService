@@ -36,6 +36,8 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            _logger.LogInformation($"✓ SqsEventConsumerHostedService iniciado. QueueUrl: {_queueUrl}");
+            
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
@@ -53,6 +55,8 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                         await Task.Delay(_pollingIntervalMs, stoppingToken);
                         continue;
                     }
+
+                    _logger.LogInformation($"✓ Recebidas {response.Messages.Count} mensagens da SQS");
 
                     foreach (var message in response.Messages)
                     {
@@ -97,9 +101,13 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
 
                 var payload = payloadElement.GetString() ?? string.Empty;
 
+                _logger.LogInformation($"→ Processando evento: {eventType} (CorrelationId: {correlationId})");
+
                 using var scope = _serviceProvider.CreateScope();
                 var consumer = scope.ServiceProvider.GetRequiredService<IEventConsumer>();
                 await consumer.ConsumeAsync(eventType, payload, correlationId, causationId);
+
+                _logger.LogInformation($"✓ Evento {eventType} processado com sucesso");
 
                 await _sqs.DeleteMessageAsync(_queueUrl, message.ReceiptHandle, stoppingToken);
             }

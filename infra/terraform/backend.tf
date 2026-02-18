@@ -1,10 +1,9 @@
 terraform {
   backend "s3" {
-    bucket         = "oficina-cardozo-terraform-state-sp"
-    key            = "billingservice/prod/terraform.tfstate"
-    region         = "sa-east-1"
-    encrypt        = true
-    dynamodb_table = "terraform-locks"
+    bucket  = "oficina-cardozo-terraform-state-sp"
+    key     = "billingservice/prod/terraform.tfstate"
+    region  = "sa-east-1"
+    encrypt = true
   }
 
   required_version = ">= 1.0"

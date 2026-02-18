@@ -12,6 +12,9 @@ using Amazon.SQS;
 using Amazon.SimpleNotificationService;
 using Amazon.Runtime;
 
+// Configure AppContext for Npgsql DateTime handling
+AppContext.SetSwitch("Npgsql.DisableDateTimeInfinityConversions", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Configuração do JWT (chave de exemplo, troque para produção)

@@ -81,6 +81,9 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
             {
                 try
                 {
+                    // ⚠️ CRÍTICO: Desatach a entidade rastreada para evitar DateTime Kind mismatch
+                    _db.Entry(orcamento).State = EntityState.Detached;
+
                     // Usar ExecuteUpdateAsync para atualizar apenas os campos necessários,
                     // evitando problemas de DateTime Kind mismatch carregando a entidade completa
                     await _db.Orcamentos

@@ -119,7 +119,7 @@ var postgresConnectionString = $"Host={dbHost};Database={dbName};Username={dbUse
 builder.Services.AddDbContext<BillingDbContext>(options =>
     options.UseNpgsql(postgresConnectionString, npgsqlOptions => 
     {
-        npgsqlOptions.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelaySeconds: 5);
+        npgsqlOptions.EnableRetryOnFailure(maxRetryCount: 3, TimeSpan.FromSeconds(5));
     }));
 
 var app = builder.Build();

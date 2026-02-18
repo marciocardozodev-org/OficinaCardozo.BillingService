@@ -45,7 +45,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
             if (orcamento.Status != StatusOrcamento.Enviado)
                 throw new InvalidOperationException($"Orçamento deve estar em status 'Enviado' para ser aprovado. Status atual: {orcamento.Status}");
 
-            // Atualizar status do orçamento
+            // Atualizar status do orçamento via ExecuteUpdateAsync (executa direto no banco)
             var approvedAt = DateTime.UtcNow;
             var approvedAtUtc = DateTime.SpecifyKind(approvedAt, DateTimeKind.Utc);
 
@@ -65,7 +65,14 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 CausationId = causation
             };
 
-            // Criar OutboxMessage para publicação
+            // Fazer UPDATE direto no banco via ExecuteUpdateAsync
+            await _db.Orcamentos
+                .Where(o => o.Id == orcamento.Id)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(o => o.Status, StatusOrcamento.Aprovado)
+                    .SetProperty(o => o.AtualizadoEm, approvedAtUtc));
+
+            // Depois adicionar OutboxMessage em uma operação separada
             var outboxMessage = new OutboxMessage
             {
                 EventType = "BudgetApproved",
@@ -76,36 +83,12 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 Published = false
             };
 
-            // Usar transação para garantir consistência
-            using (var transaction = await _db.Database.BeginTransactionAsync())
-            {
-                try
-                {
-                    // ⚠️ CRÍTICO: Desatach a entidade rastreada para evitar DateTime Kind mismatch
-                    _db.Entry(orcamento).State = EntityState.Detached;
+            _db.OutboxMessages.Add(outboxMessage);
+            await _db.SaveChangesAsync();
 
-                    // Usar ExecuteUpdateAsync para atualizar apenas os campos necessários,
-                    // evitando problemas de DateTime Kind mismatch carregando a entidade completa
-                    await _db.Orcamentos
-                        .Where(o => o.Id == orcamento.Id)
-                        .ExecuteUpdateAsync(s => s
-                            .SetProperty(o => o.Status, StatusOrcamento.Aprovado)
-                            .SetProperty(o => o.AtualizadoEm, approvedAtUtc));
-
-                    _db.OutboxMessages.Add(outboxMessage);
-                    await _db.SaveChangesAsync();
-                    await transaction.CommitAsync();
-
-                    // Recarregar a entidade com os valores atualizados para retornar
-                    orcamento.Status = StatusOrcamento.Aprovado;
-                    orcamento.AtualizadoEm = approvedAtUtc;
-                }
-                catch
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
-            }
+            // Atualizar valores locais para retornar
+            orcamento.Status = StatusOrcamento.Aprovado;
+            orcamento.AtualizadoEm = approvedAtUtc;
 
             return orcamento;
         }

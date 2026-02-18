@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: billingservice
-        image: marciocardozodev/oficinacardozo-billingservice:5e8e390-new
+        image: marciocardozodev/oficinacardozo-billingservice:4543006
         ports:
         - containerPort: 80
         env:

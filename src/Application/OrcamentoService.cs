@@ -1,5 +1,7 @@
 using OFICINACARDOZO.BILLINGSERVICE.Domain;
+using OFICINACARDOZO.BILLINGSERVICE.Messaging;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace OFICINACARDOZO.BILLINGSERVICE.Application
 {
@@ -32,6 +34,66 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
         public async Task<Orcamento?> GetBudgetByOsIdAsync(Guid osId)
         {
             return await _db.Orcamentos.FirstOrDefaultAsync(o => o.OsId == osId);
+        }
+
+        public async Task<Orcamento> AprovaBudgetAsync(Guid osId, Guid? correlationId = null, Guid? causationId = null)
+        {
+            var orcamento = await GetBudgetByOsIdAsync(osId);
+            if (orcamento == null)
+                throw new KeyNotFoundException($"Orçamento não encontrado para OsId: {osId}");
+
+            if (orcamento.Status != StatusOrcamento.Enviado)
+                throw new InvalidOperationException($"Orçamento deve estar em status 'Enviado' para ser aprovado. Status atual: {orcamento.Status}");
+
+            // Atualizar status do orçamento
+            orcamento.Status = StatusOrcamento.Aprovado;
+            orcamento.AtualizadoEm = DateTime.UtcNow;
+
+            // Propagar correlation_id se não fornecido
+            var correlation = correlationId ?? orcamento.CorrelationId;
+            var causation = causationId ?? Guid.NewGuid();
+
+            // Criar evento BudgetApproved
+            var budgetApprovedEvent = new BudgetApproved
+            {
+                OrcamentoId = orcamento.Id,
+                OsId = orcamento.OsId,
+                Valor = orcamento.Valor,
+                Status = "Aprovado",
+                ApprovedAt = DateTime.UtcNow,
+                CorrelationId = correlation,
+                CausationId = causation
+            };
+
+            // Criar OutboxMessage para publicação
+            var outboxMessage = new OutboxMessage
+            {
+                EventType = "BudgetApproved",
+                Payload = JsonSerializer.Serialize(budgetApprovedEvent),
+                CorrelationId = correlation,
+                CausationId = causation,
+                CreatedAt = DateTime.UtcNow,
+                Published = false
+            };
+
+            // Usar transação para garantir consistência
+            using (var transaction = await _db.Database.BeginTransactionAsync())
+            {
+                try
+                {
+                    _db.Orcamentos.Update(orcamento);
+                    _db.OutboxMessages.Add(outboxMessage);
+                    await _db.SaveChangesAsync();
+                    await transaction.CommitAsync();
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            }
+
+            return orcamento;
         }
     }
 }

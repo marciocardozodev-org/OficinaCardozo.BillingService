@@ -71,6 +71,32 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
             );
             return Ok(atualizacao);
         }
+
+        [HttpPost("budgets/{osId}/approve")]
+        public async Task<IActionResult> AprovaBudget(Guid osId, [FromBody] BudgetApprovalRequestDto? dto = null)
+        {
+            try
+            {
+                var orcamento = await _orcamentoService.AprovaBudgetAsync(
+                    osId,
+                    dto?.CorrelationId,
+                    dto?.CausationId
+                );
+                return Ok(orcamento);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { erro = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { erro = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { erro = "Erro ao aprovar orçamento", detalhe = ex.Message });
+            }
+        }
     }
 
     public class OrcamentoRequestDto
@@ -97,6 +123,12 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
         public Guid OsId { get; set; }
         public string NovoStatus { get; set; } = string.Empty;
         public string? EventType { get; set; }
+        public Guid? CorrelationId { get; set; }
+        public Guid? CausationId { get; set; }
+    }
+
+    public class BudgetApprovalRequestDto
+    {
         public Guid? CorrelationId { get; set; }
         public Guid? CausationId { get; set; }
     }

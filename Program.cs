@@ -8,12 +8,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-
-// Configure AppContext for Npgsql DateTime handling
-AppContext.SetSwitch("Npgsql.DisableDateTimeInfinityConversions", true);
 using Amazon.SQS;
 using Amazon.SimpleNotificationService;
 using Amazon.Runtime;
+
+// Configure AppContext for Npgsql DateTime handling
+AppContext.SetSwitch("Npgsql.DisableDateTimeInfinityConversions", true);
 
 var builder = WebApplication.CreateBuilder(args);
 

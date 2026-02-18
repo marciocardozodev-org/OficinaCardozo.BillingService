@@ -1,6 +1,6 @@
 using System;
 
-namespace OficinaCardozo.BillingService.Messaging
+namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
 {
     public class OutboxMessage
     {

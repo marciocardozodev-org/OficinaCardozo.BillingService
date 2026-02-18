@@ -3,7 +3,7 @@ using Amazon.SQS.Model;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace OficinaCardozo.BillingService.Messaging
+namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
 {
     public class SqsEventPublisher : IEventPublisher
     {

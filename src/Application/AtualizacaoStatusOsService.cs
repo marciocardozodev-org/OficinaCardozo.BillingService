@@ -1,21 +1,41 @@
 using OFICINACARDOZO.BILLINGSERVICE.Domain;
+using Microsoft.EntityFrameworkCore;
 
 namespace OFICINACARDOZO.BILLINGSERVICE.Application
 {
     public class AtualizacaoStatusOsService
     {
-        private readonly List<AtualizacaoStatusOs> _atualizacoes = new();
-        public AtualizacaoStatusOs AtualizarStatus(int ordemServicoId, string novoStatus)
+        private readonly BillingDbContext _context;
+        
+        public AtualizacaoStatusOsService(BillingDbContext context)
+        {
+            _context = context;
+        }
+
+        public AtualizacaoStatusOs AtualizarStatus(
+            Guid osId, 
+            string novoStatus,
+            string? eventType = null,
+            Guid? correlationId = null,
+            Guid? causationId = null)
         {
             var atualizacao = new AtualizacaoStatusOs
             {
-                OrdemServicoId = ordemServicoId,
+                OsId = osId,
                 NovoStatus = novoStatus,
+                EventType = eventType,
+                CorrelationId = correlationId,
+                CausationId = causationId,
                 AtualizadoEm = DateTime.UtcNow
             };
-            _atualizacoes.Add(atualizacao);
+            _context.AtualizacoesStatusOs.Add(atualizacao);
+            _context.SaveChanges();
             return atualizacao;
         }
-        public IEnumerable<AtualizacaoStatusOs> ListarPorOrdem(int ordemServicoId) => _atualizacoes.Where(a => a.OrdemServicoId == ordemServicoId);
+        
+        public IEnumerable<AtualizacaoStatusOs> ListarPorOrdem(Guid osId) => 
+            _context.AtualizacoesStatusOs
+                .Where(a => a.OsId == osId)
+                .ToList();
     }
 }

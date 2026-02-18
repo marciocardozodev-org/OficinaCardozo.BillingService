@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aws-messaging-config
+  namespace: default
+data:
+  AWS_REGION: sa-east-1
+  AWS_SQS_QUEUE_BILLING: https://sqs.sa-east-1.amazonaws.com/953082827427/billing-events
+  AWS_SQS_QUEUE_DLQ_BILLING: https://sqs.sa-east-1.amazonaws.com/953082827427/billing-events-dlq
+  AWS_SNS_TOPIC_BUDGETGENERATED: arn:aws:sns:sa-east-1:953082827427:budget-generated
+  AWS_SNS_TOPIC_BUDGETAPPROVED: arn:aws:sns:sa-east-1:953082827427:budget-approved
+  AWS_SNS_TOPIC_PAYMENTCONFIRMED: arn:aws:sns:sa-east-1:953082827427:payment-confirmed
+  AWS_SNS_TOPIC_PAYMENTFAILED: arn:aws:sns:sa-east-1:953082827427:payment-failed
+  AWS_SNS_TOPIC_PAYMENTREVERSED: arn:aws:sns:sa-east-1:953082827427:payment-reversed

@@ -1,2 +1,16 @@
 bin/
 obj/
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

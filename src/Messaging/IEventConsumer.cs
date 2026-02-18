@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace OficinaCardozo.BillingService.Messaging
+namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
 {
     public interface IEventConsumer
     {

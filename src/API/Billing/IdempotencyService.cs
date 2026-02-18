@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace OficinaCardozo.BillingService.API.Billing
+namespace OFICINACARDOZO.BILLINGSERVICE.API.Billing
 {
     public class IdempotencyService
     {

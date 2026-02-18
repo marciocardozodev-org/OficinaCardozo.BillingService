@@ -10,22 +10,32 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
             _context = context;
         }
 
-        public Pagamento RegistrarPagamento(int ordemServicoId, decimal valor, string metodo)
+        public Pagamento RegistrarPagamento(
+            Guid osId, 
+            long orcamentoId,
+            decimal valor, 
+            string metodo,
+            Guid correlationId,
+            Guid causationId)
         {
             var pagamento = new Pagamento
             {
-                OrdemServicoId = ordemServicoId,
+                OsId = osId,
+                OrcamentoId = orcamentoId,
                 Valor = valor,
                 Metodo = metodo,
                 Status = StatusPagamento.Confirmado,
-                CriadoEm = DateTime.UtcNow
+                CorrelationId = correlationId,
+                CausationId = causationId,
+                CriadoEm = DateTime.UtcNow,
+                AtualizadoEm = DateTime.UtcNow
             };
             _context.Pagamentos.Add(pagamento);
             _context.SaveChanges();
             return pagamento;
         }
 
-        public Pagamento? ObterPagamento(int pagamentoId)
+        public Pagamento? ObterPagamento(long pagamentoId)
         {
             return _context.Pagamentos.FirstOrDefault(p => p.Id == pagamentoId);
         }

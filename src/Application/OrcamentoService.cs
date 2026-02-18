@@ -75,7 +75,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
             // Depois adicionar OutboxMessage em uma operação separada
             var outboxMessage = new OutboxMessage
             {
-                AggregateId = orcamento.Id,
+                AggregateId = orcamento.OsId,
                 EventType = "BudgetApproved",
                 Payload = JsonSerializer.Serialize(budgetApprovedEvent),
                 CorrelationId = correlation,

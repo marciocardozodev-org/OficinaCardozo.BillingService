@@ -1,25 +1,37 @@
 using OFICINACARDOZO.BILLINGSERVICE.Domain;
+using Microsoft.EntityFrameworkCore;
 
 namespace OFICINACARDOZO.BILLINGSERVICE.Application
 {
     public class OrcamentoService
     {
-        private readonly List<Orcamento> _orcamentos = new();
-        public Orcamento GerarEEnviarOrcamento(int ordemServicoId, decimal valor, string emailCliente)
+        private readonly BillingDbContext _db;
+        public OrcamentoService(BillingDbContext db)
+        {
+            _db = db;
+        }
+
+        public async Task<Orcamento> GerarEEnviarOrcamentoAsync(Guid osId, decimal valor, string emailCliente, Guid correlationId, Guid causationId)
         {
             var orcamento = new Orcamento
             {
-                Id = _orcamentos.Count + 1,
-                OrdemServicoId = ordemServicoId,
+                OsId = osId,
                 Valor = valor,
                 EmailCliente = emailCliente,
                 Status = StatusOrcamento.Enviado,
-                CriadoEm = DateTime.UtcNow
+                CorrelationId = correlationId,
+                CausationId = causationId,
+                CriadoEm = DateTime.UtcNow,
+                AtualizadoEm = DateTime.UtcNow
             };
-            _orcamentos.Add(orcamento);
-            // Simular envio de orçamento por e-mail
+            _db.Orcamentos.Add(orcamento);
+            await _db.SaveChangesAsync();
             return orcamento;
         }
-        public IEnumerable<Orcamento> ListarPorOrdem(int ordemServicoId) => _orcamentos.Where(o => o.OrdemServicoId == ordemServicoId);
+
+        public async Task<Orcamento?> GetBudgetByOsIdAsync(Guid osId)
+        {
+            return await _db.Orcamentos.FirstOrDefaultAsync(o => o.OsId == osId);
+        }
     }
 }

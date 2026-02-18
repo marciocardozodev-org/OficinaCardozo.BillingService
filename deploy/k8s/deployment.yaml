@@ -48,6 +48,57 @@ spec:
             secretKeyRef:
               name: oficina-cardozo-db-secret
               key: DB_NAME
+        # AWS Messaging Configuration
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-messaging-secrets
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-messaging-secrets
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: aws-messaging-config
+              key: AWS_REGION
+        - name: AWS_SQS_QUEUE_BILLING
+          valueFrom:
+            configMapKeyRef:
+              name: aws-messaging-config
+              key: AWS_SQS_QUEUE_BILLING
+        - name: AWS_SQS_QUEUE_DLQ_BILLING
+          valueFrom:
+            configMapKeyRef:
+              name: aws-messaging-config
+              key: AWS_SQS_QUEUE_DLQ_BILLING
+        - name: AWS_SNS_TOPIC_BUDGETGENERATED
+          valueFrom:
+            configMapKeyRef:
+              name: aws-messaging-config
+              key: AWS_SNS_TOPIC_BUDGETGENERATED
+        - name: AWS_SNS_TOPIC_BUDGETAPPROVED
+          valueFrom:
+            configMapKeyRef:
+              name: aws-messaging-config
+              key: AWS_SNS_TOPIC_BUDGETAPPROVED
+        - name: AWS_SNS_TOPIC_PAYMENTCONFIRMED
+          valueFrom:
+            configMapKeyRef:
+              name: aws-messaging-config
+              key: AWS_SNS_TOPIC_PAYMENTCONFIRMED
+        - name: AWS_SNS_TOPIC_PAYMENTFAILED
+          valueFrom:
+            configMapKeyRef:
+              name: aws-messaging-config
+              key: AWS_SNS_TOPIC_PAYMENTFAILED
+        - name: AWS_SNS_TOPIC_PAYMENTREVERSED
+          valueFrom:
+            configMapKeyRef:
+              name: aws-messaging-config
+              key: AWS_SNS_TOPIC_PAYMENTREVERSED
         volumeMounts:
         - name: cert-global-bundle-pe
           mountPath: /etc/ssl/certs/global-bundle.pem
@@ -58,6 +109,16 @@ spec:
             port: 80
           initialDelaySeconds: 5
           periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 15
+          periodSeconds: 20
+      volumes:
+      - name: cert-global-bundle-pe
+        configMap:
+          name: cert-global-bundle-pe
         livenessProbe:
           httpGet:
             path: /health

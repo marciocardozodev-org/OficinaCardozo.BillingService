@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="AWSSDK.SimpleNotificationService" Version="4.0.2.16" />
     <PackageReference Include="AWSSDK.SQS" Version="4.0.2.14" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.0" />

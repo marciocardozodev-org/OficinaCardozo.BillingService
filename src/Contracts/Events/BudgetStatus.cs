@@ -1,4 +1,4 @@
-namespace OficinaCardozo.BillingService.Contracts.Events
+namespace OFICINACARDOZO.BILLINGSERVICE.Contracts.Events
 {
     public enum BudgetStatus
     {

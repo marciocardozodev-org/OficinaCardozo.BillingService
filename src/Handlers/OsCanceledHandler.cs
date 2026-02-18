@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
-using OficinaCardozo.BillingService.Contracts.Events;
-using OficinaCardozo.BillingService.Messaging;
+using OFICINACARDOZO.BILLINGSERVICE.Contracts.Events;
+using OFICINACARDOZO.BILLINGSERVICE.Messaging;
 
-namespace OficinaCardozo.BillingService.Handlers
+namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
 {
     public class OsCanceledHandler
     {

@@ -1,6 +1,6 @@
 using System;
 
-namespace OficinaCardozo.BillingService.Contracts.Events
+namespace OFICINACARDOZO.BILLINGSERVICE.Contracts.Events
 {
     public class BudgetApproved
     {

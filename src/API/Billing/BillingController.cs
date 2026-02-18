@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 
-namespace OficinaCardozo.BillingService.API.Billing
+namespace OFICINACARDOZO.BILLINGSERVICE.API.Billing
 {
     [ApiController]
     [Route("billing")]

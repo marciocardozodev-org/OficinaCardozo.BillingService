@@ -2,7 +2,7 @@ using Amazon.SQS;
 using Amazon.SQS.Model;
 using System.Threading.Tasks;
 
-namespace OficinaCardozo.BillingService.Messaging
+namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
 {
     public class SqsEventConsumer : IEventConsumer
     {

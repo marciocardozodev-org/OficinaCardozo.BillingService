@@ -46,6 +46,8 @@ namespace OFICINACARDOZO.BILLINGSERVICE
                 entity.Property(e => e.ProviderEventId).HasColumnName("provider_event_id");
                 entity.Property(e => e.CorrelationId).HasColumnName("correlation_id");
                 entity.Property(e => e.CausationId).HasColumnName("causation_id");
+                entity.Property(e => e.Processed).HasColumnName("processed");
+                entity.Property(e => e.ProcessedAt).HasColumnName("processed_at");
             });
 
             // Configurar Orcamento

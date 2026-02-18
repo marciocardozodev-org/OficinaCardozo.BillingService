@@ -24,6 +24,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Id).HasColumnName("id");
                 entity.Property(e => e.AggregateId).HasColumnName("aggregate_id").IsRequired();
+                entity.Property(e => e.AggregateType).HasColumnName("aggregate_type").IsRequired();
                 entity.Property(e => e.EventType).HasColumnName("event_type").IsRequired();
                 entity.Property(e => e.Payload).HasColumnName("payload").IsRequired();
                 entity.Property(e => e.CreatedAt).HasColumnName("created_at");

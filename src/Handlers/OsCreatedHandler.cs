@@ -65,6 +65,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                 var outboxMessage = new OutboxMessage
                 {
                     AggregateId = orcamento.OsId,
+                    AggregateType = "OrderService",
                     EventType = nameof(BudgetGenerated),
                     Payload = JsonSerializer.Serialize(budgetGenerated),
                     CreatedAt = DateTime.UtcNow,

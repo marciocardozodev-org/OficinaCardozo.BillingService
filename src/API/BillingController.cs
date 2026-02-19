@@ -117,14 +117,14 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
                     return NotFound(new { erro = $"Nenhum orçamento encontrado para OS {osId}" });
                 }
 
-                // ✅ Verificar se está aprovado (status = 2)
-                if (orcamento.Status != 2)
+                // ✅ Verificar se está aprovado
+                if (orcamento.Status != StatusOrcamento.Aprovado)
                 {
                     return BadRequest(new
                     {
                         erro = "Orçamento não está aprovado",
                         statusAtual = orcamento.Status,
-                        esperado = 2
+                        esperado = StatusOrcamento.Aprovado
                     });
                 }
 

@@ -78,16 +78,14 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 // Criar evento PaymentConfirmed
                 var paymentConfirmedEvent = new PaymentConfirmed
                 {
-                    PaymentId = pagamento.Id,
+                    PaymentId = LongToGuid(pagamento.Id),
                     OsId = osId,
-                    OrcamentoId = orcamentoId,
-                    Valor = valor,
-                    ProviderPaymentId = providerPaymentId,
-                    Status = "Confirmado",
-                    ConfirmedAt = DateTime.UtcNow,
-                    CorrelationId = correlationId,
-                    CausationId = Guid.NewGuid()  // Novo ID para o evento
+                    Status = PaymentStatus.Confirmed,
+                    Amount = valor,
+                    ProviderPaymentId = providerPaymentId
                 };
+
+                var eventCausationId = Guid.NewGuid();
 
                 var outboxMessage = new OutboxMessage
                 {
@@ -98,7 +96,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                     CreatedAt = DateTime.UtcNow,
                     Published = false,
                     CorrelationId = correlationId,
-                    CausationId = paymentConfirmedEvent.CausationId
+                    CausationId = eventCausationId
                 };
 
                 _context.Set<OutboxMessage>().Add(outboxMessage);
@@ -117,15 +115,13 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 // Criar evento PaymentFailed
                 var paymentFailedEvent = new PaymentFailed
                 {
-                    PaymentId = pagamento.Id,
+                    PaymentId = LongToGuid(pagamento.Id),
                     OsId = osId,
-                    OrcamentoId = orcamentoId,
-                    Valor = valor,
-                    Reason = "Falha na autorização do provedor",
-                    FailedAt = DateTime.UtcNow,
-                    CorrelationId = correlationId,
-                    CausationId = Guid.NewGuid()
+                    Status = PaymentStatus.Failed,
+                    Reason = "Falha na autorização do provedor"
                 };
+
+                var eventCausationId = Guid.NewGuid();
 
                 var outboxMessage = new OutboxMessage
                 {
@@ -136,7 +132,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                     CreatedAt = DateTime.UtcNow,
                     Published = false,
                     CorrelationId = correlationId,
-                    CausationId = paymentFailedEvent.CausationId
+                    CausationId = eventCausationId
                 };
 
                 _context.Set<OutboxMessage>().Add(outboxMessage);
@@ -174,6 +170,19 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
             _context.Pagamentos.Add(pagamento);
             _context.SaveChanges();
             return pagamento;
+        }
+
+        private static Guid LongToGuid(long value)
+        {
+            var bytes = new byte[16];
+            var valueBytes = BitConverter.GetBytes(value);
+            if (!BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(valueBytes);
+            }
+
+            Array.Copy(valueBytes, 0, bytes, 8, 8);
+            return new Guid(bytes);
         }
 
         public Pagamento? ObterPagamento(long pagamentoId)

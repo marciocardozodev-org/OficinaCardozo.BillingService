@@ -90,11 +90,21 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
             }
             catch (Exception ex)
             {
+                // ✅ IDEMPOTÊNCIA: Se orçamento já existe, ignorar (duplicate key)
+                if (ex.InnerException?.Message?.Contains("duplicate key") == true || 
+                    ex.InnerException?.Message?.Contains("orcamento_os_id_key") == true)
+                {
+                    _logger.LogInformation(
+                        "Orçamento para OS {OsId} já existe. Ignorando reprocessamento (idempotente).",
+                        envelope.Payload.OsId);
+                    return;  // ✅ Não relança - tratar como sucesso
+                }
+                
                 _logger.LogError(
                     ex,
                     "Erro ao processar OsCreated para OS {OsId}",
                     envelope.Payload.OsId);
-                throw;
+                throw;  // ❌ Relança apenas para erros reais
             }
         }
     }

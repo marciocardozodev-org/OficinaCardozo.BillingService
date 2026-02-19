@@ -60,6 +60,14 @@ builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.PagamentoSe
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.AtualizacaoStatusOsService>();
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.OrcamentoService>();
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.ServiceOrchestrator>();
+
+// Payment Service Mock (Mercado Pago)
+builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.API.Billing.IMercadoPagoService>(sp =>
+    new OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoMockService(
+        sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoMockService>>()
+    )
+);
+
 builder.Services.AddHealthChecks();
 
 // AWS Messaging Configuration (mesma estratégia do OSService)

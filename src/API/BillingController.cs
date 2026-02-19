@@ -98,6 +98,61 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
                 return StatusCode(500, new { erro = "Erro ao aprovar orçamento", detalhe = ex.Message });
             }
         }
+
+        [HttpPost("payments/{osId}/start")]
+        [AllowAnonymous]  // ✅ TEMP: Para teste E2E
+        public async Task<IActionResult> InitiarPagamento(
+            Guid osId,
+            [FromBody] PaymentInitiationRequestDto? dto = null)
+        {
+            try
+            {
+                var correlationId = dto?.CorrelationId ?? Guid.NewGuid();
+                var causationId = dto?.CausationId ?? Guid.NewGuid();
+
+                // ✅ Buscar orçamento aprovado
+                var orcamento = await _orcamentoService.ObterOrcamentoPorOsIdAsync(osId);
+                if (orcamento == null)
+                {
+                    return NotFound(new { erro = $"Nenhum orçamento encontrado para OS {osId}" });
+                }
+
+                // ✅ Verificar se está aprovado (status = 2)
+                if (orcamento.Status != 2)
+                {
+                    return BadRequest(new
+                    {
+                        erro = "Orçamento não está aprovado",
+                        statusAtual = orcamento.Status,
+                        esperado = 2
+                    });
+                }
+
+                // ✅ Iniciar pagamento com mock do Mercado Pago
+                var pagamento = await _pagamentoService.IniciarPagamentoAsync(
+                    osId,
+                    orcamento.Id,
+                    orcamento.Valor,
+                    correlationId,
+                    causationId
+                );
+
+                return Ok(new
+                {
+                    pagamento.Id,
+                    pagamento.OsId,
+                    pagamento.OrcamentoId,
+                    pagamento.Valor,
+                    Status = pagamento.Status.ToString(),
+                    pagamento.ProviderPaymentId,
+                    pagamento.CriadoEm
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { erro = "Erro ao iniciar pagamento", detalhe = ex.Message });
+            }
+        }
     }
 
     public class OrcamentoRequestDto
@@ -129,6 +184,12 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
     }
 
     public class BudgetApprovalRequestDto
+    {
+        public Guid? CorrelationId { get; set; }
+        public Guid? CausationId { get; set; }
+    }
+
+    public class PaymentInitiationRequestDto
     {
         public Guid? CorrelationId { get; set; }
         public Guid? CausationId { get; set; }

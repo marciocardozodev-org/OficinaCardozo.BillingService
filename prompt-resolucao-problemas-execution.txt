@@ -1,0 +1,394 @@
+Orientações para Resolução de Problemas - ExecutionService
+==========================================================
+
+Baseado na experiência do BillingService
+
+CONTEXTO
+========
+
+O ExecutionService reportou sucesso na correção após enfrentar problemas com:
+1. Valores hardcoded (localhost, ARNs incorretos)
+2. Leitura de variáveis de ambiente do ConfigMap
+3. NotFoundException no SNS (tópico não provisionado)
+
+Vamos orientar como o BillingService resolveu problemas similares.
+
+
+PROBLEMA 1: VALORES HARDCODED vs CONFIGMAP
+===========================================
+
+Sintoma Reportado pelo ExecutionService:
+----------------------------------------
+❌ ANTES: SQS hardcoded: http://localhost:9324/queue/billing-events
+❌ ANTES: SNS hardcoded: arn:aws:sns:us-east-1:000000000000:execution-events
+✅ DEPOIS: SQS do ConfigMap: https://sqs.sa-east-1.amazonaws.com/953082827427/billing-events
+✅ DEPOIS: SNS do ConfigMap: arn:aws:sns:sa-east-1:953082827427:execution-events
+
+Como o BillingService Resolve:
+-------------------------------
+
+1. Sempre usar Environment.GetEnvironmentVariable() com fallback para desenvolvimento local
+2. Nunca hardcodar valores de produção no código
+3. Usar ConfigMap do Kubernetes para injetar variáveis
+
+EXEMPLO DO BILLINGSERVICE - Program.cs:
+---------------------------------------
+
+    // ✅ CORRETO: Lê variável de ambiente com fallback
+    var awsRegion = Environment.GetEnvironmentVariable("AWS_REGION") ?? "sa-east-1";
+    var sqsQueueUrl = Environment.GetEnvironmentVariable("AWS_SQS_QUEUE_BILLING") 
+        ?? "http://localhost:4566/000000000000/billing-events";
+
+    // SNS Topics Configuration (para OutboxProcessor)
+    var snsTopics = new SnsTopicConfiguration
+    {
+        BudgetGeneratedTopicArn = Environment.GetEnvironmentVariable("AWS_SNS_TOPIC_BUDGETGENERATED") 
+            ?? "arn:aws:sns:sa-east-1:000000000000:budget-generated",
+        PaymentConfirmedTopicArn = Environment.GetEnvironmentVariable("AWS_SNS_TOPIC_PAYMENTCONFIRMED") 
+            ?? "arn:aws:sns:sa-east-1:000000000000:payment-confirmed",
+        // ... outros tópicos
+    };
+    builder.Services.AddSingleton(snsTopics);
+
+EXEMPLO DO BILLINGSERVICE - SqsEventConsumerHostedService.cs:
+-------------------------------------------------------------
+
+    public SqsEventConsumerHostedService(
+        IServiceProvider serviceProvider,
+        IAmazonSQS sqs,
+        ILogger<SqsEventConsumerHostedService> logger,
+        int pollingIntervalMs = 5000)
+    {
+        _serviceProvider = serviceProvider;
+        _sqs = sqs;
+        _logger = logger;
+        _pollingIntervalMs = pollingIntervalMs;
+        
+        // ✅ CORRETO: Lê da variável de ambiente
+        _queueUrl = Environment.GetEnvironmentVariable("AWS_SQS_QUEUE_BILLING")
+            ?? "http://localhost:4566/000000000000/billing-events";
+    }
+
+AÇÃO RECOMENDADA PARA EXECUTIONSERVICE:
+---------------------------------------
+
+1. Verificar se TODOS os lugares que usam AWS_SQS_QUEUE ou AWS_SNS_TOPIC estão lendo via Environment.GetEnvironmentVariable()
+2. Confirmar que o ConfigMap aws-messaging-config está sendo injetado no Deployment via envFrom
+3. Nunca usar valores hardcoded em produção (apenas como fallback para dev local)
+
+
+PROBLEMA 2: CONFIGMAP NÃO INJETADO NO DEPLOYMENT
+=================================================
+
+Como o BillingService Garante Injeção:
+--------------------------------------
+
+CONFIGMAP - deploy/k8s/aws-messaging-config.yaml:
+-------------------------------------------------
+
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: aws-messaging-config
+      namespace: default
+    data:
+      AWS_REGION: sa-east-1
+      AWS_SQS_QUEUE_BILLING: https://sqs.sa-east-1.amazonaws.com/953082827427/billing-events
+      AWS_SQS_QUEUE_DLQ_BILLING: https://sqs.sa-east-1.amazonaws.com/953082827427/billing-events-dlq
+      AWS_SNS_TOPIC_BUDGETGENERATED: arn:aws:sns:sa-east-1:953082827427:budget-generated
+      AWS_SNS_TOPIC_BUDGETAPPROVED: arn:aws:sns:sa-east-1:953082827427:budget-approved
+      AWS_SNS_TOPIC_PAYMENTCONFIRMED: arn:aws:sns:sa-east-1:953082827427:payment-confirmed
+      AWS_SNS_TOPIC_PAYMENTFAILED: arn:aws:sns:sa-east-1:953082827427:payment-failed
+      AWS_SNS_TOPIC_PAYMENTREVERSED: arn:aws:sns:sa-east-1:953082827427:payment-reversed
+
+DEPLOYMENT - deploy/k8s/deployment.yaml:
+----------------------------------------
+
+    spec:
+      containers:
+      - name: billingservice
+        image: marciocardozodev/oficinacardozo-billingservice:latest
+        ports:
+        - containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: aws-messaging-config  # ✅ INJETA TODAS as variáveis do ConfigMap
+        - secretRef:
+            name: aws-messaging-secrets  # ✅ INJETA credenciais AWS
+        - configMapRef:
+            name: billingservice-config
+        - secretRef:
+            name: billingservice-db-secret
+
+WORKFLOW - .github/workflows/ci-cd-billingservice.yml:
+------------------------------------------------------
+
+    - name: Aplicar ConfigMap aws-messaging-config
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'
+      run: kubectl apply -f deploy/k8s/aws-messaging-config.yaml
+
+    - name: Garantir secret aws-messaging-secrets com credenciais AWS
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      run: |
+        kubectl create secret generic aws-messaging-secrets \
+          --from-literal=AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+          --from-literal=AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+          -n default --dry-run=client -o yaml | kubectl apply -f -
+
+AÇÃO RECOMENDADA PARA EXECUTIONSERVICE:
+---------------------------------------
+
+1. Criar ConfigMap aws-messaging-config com TODAS as variáveis necessárias
+2. No Deployment, adicionar envFrom com configMapRef e secretRef
+3. No workflow CI/CD, aplicar o ConfigMap ANTES do deployment
+4. Validar que o pod recebe as variáveis: kubectl exec <pod> -- env | grep AWS
+
+
+PROBLEMA 3: NotFoundException NO SNS (TÓPICO NÃO EXISTE)
+=========================================================
+
+Sintoma Reportado pelo ExecutionService:
+----------------------------------------
+✅ Código está correto (ARN válido)
+⚠️ NotFoundException: tópico execution-events não existe na conta AWS
+
+Interpretação do BillingService:
+--------------------------------
+
+Este NÃO é um erro de código, é um erro de INFRAESTRUTURA.
+
+O código está funcionando corretamente:
+- Lê a variável de ambiente corretamente
+- Usa o ARN correto (arn:aws:sns:sa-east-1:953082827427:execution-events)
+- Tenta publicar no SNS
+
+O problema: o tópico SNS não foi provisionado no ambiente AWS.
+
+Como o BillingService Provisiona Tópicos SNS:
+---------------------------------------------
+
+OPÇÃO 1: Via Terraform (Recomendado para Produção)
+---------------------------------------------------
+
+Criar arquivo infra/terraform/sns_topics.tf:
+
+    resource "aws_sns_topic" "execution_started" {
+      name = "execution-started"
+      
+      tags = {
+        Environment = "production"
+        Service     = "ExecutionService"
+      }
+    }
+
+    resource "aws_sns_topic" "execution_finished" {
+      name = "execution-finished"
+      
+      tags = {
+        Environment = "production"
+        Service     = "ExecutionService"
+      }
+    }
+
+    output "execution_started_topic_arn" {
+      value = aws_sns_topic.execution_started.arn
+    }
+
+    output "execution_finished_topic_arn" {
+      value = aws_sns_topic.execution_finished.arn
+    }
+
+Aplicar no workflow:
+
+    - name: Provisionar SNS Topics (Terraform)
+      working-directory: infra/terraform
+      run: |
+        terraform init
+        terraform plan -var="enable_sns=true"
+        terraform apply -auto-approve -var="enable_sns=true"
+
+OPÇÃO 2: Via AWS CLI (Rápido para Teste)
+-----------------------------------------
+
+    aws sns create-topic \
+      --name execution-started \
+      --region sa-east-1
+
+    aws sns create-topic \
+      --name execution-finished \
+      --region sa-east-1
+
+Capturar ARNs:
+
+    aws sns list-topics --region sa-east-1 | grep execution
+
+Atualizar ConfigMap com ARNs reais.
+
+OPÇÃO 3: Via Console AWS (Manual)
+----------------------------------
+
+1. Acessar AWS Console → SNS → Topics
+2. Criar tópico "execution-started"
+3. Criar tópico "execution-finished"
+4. Copiar ARNs gerados
+5. Atualizar ConfigMap aws-messaging-config
+
+AÇÃO RECOMENDADA PARA EXECUTIONSERVICE:
+---------------------------------------
+
+1. Escolher OPÇÃO 1 (Terraform) para produção
+2. Provisionar tópicos execution-started e execution-finished
+3. Atualizar ConfigMap com ARNs reais
+4. Redeployar o pod (kubectl rollout restart deployment/executionservice)
+5. Validar publicação nos logs: grep "publicada com sucesso no SNS"
+
+
+PROBLEMA 4: CREDENCIAIS AWS INVÁLIDAS OU AUSENTES
+==================================================
+
+Como o BillingService Configura Credenciais:
+--------------------------------------------
+
+NO CÓDIGO - Program.cs:
+-----------------------
+
+    var awsAccessKeyId = Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID") ?? "";
+    var awsSecretAccessKey = Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY") ?? "";
+    var awsRegion = Environment.GetEnvironmentVariable("AWS_REGION") ?? "sa-east-1";
+
+    // Configurar credenciais explícitas
+    var awsCredentials = new Amazon.Runtime.BasicAWSCredentials(awsAccessKeyId, awsSecretAccessKey);
+    var awsRegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(awsRegion);
+
+    // SQS Client
+    var sqsConfig = new AmazonSQSConfig { RegionEndpoint = awsRegionEndpoint };
+    builder.Services.AddSingleton<IAmazonSQS>(new AmazonSQSClient(awsCredentials, sqsConfig));
+
+    // SNS Client
+    var snsConfig = new AmazonSimpleNotificationServiceConfig { RegionEndpoint = awsRegionEndpoint };
+    builder.Services.AddSingleton<IAmazonSimpleNotificationService>(
+        new AmazonSimpleNotificationServiceClient(awsCredentials, snsConfig));
+
+NO KUBERNETES - Secret:
+-----------------------
+
+    kubectl create secret generic aws-messaging-secrets \
+      --from-literal=AWS_ACCESS_KEY_ID="AKIA..." \
+      --from-literal=AWS_SECRET_ACCESS_KEY="..." \
+      -n default
+
+NO DEPLOYMENT - Injeção do Secret:
+----------------------------------
+
+    envFrom:
+    - secretRef:
+        name: aws-messaging-secrets
+
+VALIDAÇÃO:
+----------
+
+    # Verificar se o secret existe
+    kubectl get secret aws-messaging-secrets -n default
+
+    # Verificar se o pod recebe as credenciais (não mostrar valores!)
+    kubectl exec <pod> -- sh -c 'echo $AWS_ACCESS_KEY_ID | cut -c1-10'
+    # Saída esperada: AKIA... (primeiros 10 chars)
+
+AÇÃO RECOMENDADA PARA EXECUTIONSERVICE:
+---------------------------------------
+
+1. Verificar se Secret aws-messaging-secrets existe: kubectl get secret aws-messaging-secrets
+2. Se não existir, criar via workflow ou kubectl create secret
+3. Validar que o Deployment injeta o Secret via envFrom
+4. Testar conexão AWS: kubectl logs <pod> | grep "AWS"
+
+
+CHECKLIST DE VALIDAÇÃO COMPLETO
+================================
+
+Configuração de Variáveis:
+[ ] Código usa Environment.GetEnvironmentVariable() em TODOS os lugares
+[ ] ConfigMap aws-messaging-config criado com AWS_REGION, AWS_SQS_*, AWS_SNS_*
+[ ] Secret aws-messaging-secrets criado com AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY
+[ ] Deployment injeta ConfigMap via envFrom → configMapRef
+[ ] Deployment injeta Secret via envFrom → secretRef
+
+Provisionamento de Recursos AWS:
+[ ] Tópicos SNS criados (execution-started, execution-finished)
+[ ] Filas SQS criadas (billing-events, execution-events)
+[ ] Permissões IAM configuradas (SNS:Publish, SQS:ReceiveMessage)
+[ ] Região correta (sa-east-1) em todos os recursos
+
+Validação em Runtime:
+[ ] Pod está Running (kubectl get pods)
+[ ] Logs mostram variáveis corretas (kubectl logs <pod> | grep AWS)
+[ ] SqsConsumer conecta na fila correta (sem InvalidAddressException)
+[ ] SnsPublisher tenta publicar no ARN correto (sem InvalidAddressException)
+[ ] Eventos são publicados com sucesso (✅ publicada com sucesso no SNS)
+
+
+COMPARAÇÃO: ANTES × DEPOIS (EXECUTIONSERVICE)
+==============================================
+
+Aspecto                | ANTES (Hardcoded)                                      | DEPOIS (ConfigMap)
+-----------------------|--------------------------------------------------------|-------------------------------------------------------
+SQS Queue URL          | http://localhost:9324/queue/billing-events             | https://sqs.sa-east-1.amazonaws.com/953082827427/billing-events
+SNS Topic ARN          | arn:aws:sns:us-east-1:000000000000:execution-events    | arn:aws:sns:sa-east-1:953082827427:execution-events
+Erro                   | InvalidAddressException (endereço inválido)            | NotFoundException (recurso não existe - infra)
+Gravidade              | 🔴 CRÍTICO (código errado)                             | 🟡 BAIXO (infra pendente)
+Solução                | Usar Environment.GetEnvironmentVariable()              | Provisionar tópicos SNS via Terraform/AWS CLI
+
+
+PRÓXIMOS PASSOS PARA EXECUTIONSERVICE
+======================================
+
+1. CURTO PRAZO (Hoje):
+   [ ] Provisionar tópicos SNS execution-started e execution-finished via AWS CLI
+   [ ] Atualizar ConfigMap com ARNs reais
+   [ ] Redeployar: kubectl rollout restart deployment/executionservice
+   [ ] Validar publicação: kubectl logs -f <pod> | grep "publicada com sucesso"
+
+2. MÉDIO PRAZO (Esta Semana):
+   [ ] Criar infra/terraform/sns_topics.tf com recursos SNS
+   [ ] Integrar provisionamento no workflow CI/CD
+   [ ] Validar em ambiente de homologação
+
+3. LONGO PRAZO (Próxima Sprint):
+   [ ] Implementar DLQ (Dead Letter Queue) para mensagens falhas
+   [ ] Configurar alertas SNS para falhas de publicação
+   [ ] Monitoramento de filas (CloudWatch Metrics)
+   [ ] Testes de carga (publicação de 1000+ eventos)
+
+
+REFERÊNCIAS DO BILLINGSERVICE
+==============================
+
+Arquivos para consulta:
+- Program.cs: Configuração de SQS/SNS clients com credenciais
+- src/Handlers/SqsEventConsumerHostedService.cs: Leitura de AWS_SQS_QUEUE_BILLING
+- src/Messaging/OutboxProcessor.cs: Uso de SnsTopicConfiguration
+- deploy/k8s/aws-messaging-config.yaml: Estrutura do ConfigMap
+- deploy/k8s/deployment.yaml: Injeção via envFrom
+- .github/workflows/ci-cd-billingservice.yml: Steps de aplicação do ConfigMap/Secret
+
+Padrões seguidos:
+✅ Sempre usar Environment.GetEnvironmentVariable()
+✅ Fallback para valores de desenvolvimento local
+✅ ConfigMap para configurações não sensíveis
+✅ Secret para credenciais
+✅ Injeção via envFrom (não env individual)
+✅ Provisionamento de recursos via Terraform
+✅ Validação em logs (grep AWS, sns, sqs)
+
+
+CONCLUSÃO
+=========
+
+O ExecutionService já corrigiu o problema principal (leitura do ConfigMap). O erro atual (NotFoundException) é esperado e indica que a infraestrutura AWS precisa ser provisionada.
+
+Recomendação: Provisionar tópicos SNS via Terraform ou AWS CLI e validar publicação novamente.
+
+Qualquer dúvida, o BillingService está disponível como referência! 🚀

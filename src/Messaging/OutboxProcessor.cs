@@ -75,12 +75,14 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
 
                 // 1. Query mensagens não publicadas (ordenado por mais antigas primeiro)
                 var unpublishedMessages = await dbContext.Set<OutboxMessage>()
+                    .AsNoTracking()  // ✅ Disable change tracking for read-only query
                     .Where(m => !m.Published)
                     .OrderBy(m => m.CreatedAt)
                     .ToListAsync(stoppingToken);
 
                 if (unpublishedMessages.Count == 0)
                 {
+                    _logger.LogDebug("📭 Nenhuma mensagem Outbox pendente no momento");
                     return; // Nada para fazer
                 }
 

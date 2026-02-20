@@ -75,20 +75,36 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
         {
             try
             {
-                using var document = JsonDocument.Parse(message.Body);
-                var root = document.RootElement;
+                JsonDocument? document = null;
+                JsonElement root;
+
+                try
+                {
+                    document = JsonDocument.Parse(message.Body);
+                    root = document.RootElement;
+                }
+                catch (JsonException jsonEx)
+                {
+                    _logger.LogWarning(jsonEx, "✗ Mensagem SQS inválida (JSON malformado). Deletando.");
+                    await _sqs.DeleteMessageAsync(_queueUrl, message.ReceiptHandle, stoppingToken);
+                    return;
+                }
 
                 // Log da estrutura da mensagem para debugging
                 _logger.LogInformation($"→ Estrutura da mensagem: {document}");
 
                 // Verificar se é um envelope SNS (publicado por SNS em SQS)
-                if (!root.TryGetProperty("Message", out var messageElement))
+                string payload;
+                if (root.TryGetProperty("Message", out var messageElement))
                 {
-                    _logger.LogWarning("✗ Mensagem SQS sem campo 'Message' (não é envelope SNS)");
-                    return;
+                    payload = messageElement.GetString() ?? string.Empty;
                 }
-
-                var payload = messageElement.GetString() ?? string.Empty;
+                else
+                {
+                    // Fallback: mensagem crua (raw) direto na SQS
+                    _logger.LogWarning("✗ Mensagem SQS sem campo 'Message' (não é envelope SNS). Tentando tratar como payload bruto.");
+                    payload = message.Body;
+                }
                 
                 // Tentar extrair attributes do SNS MessageAttributes (no envelope SNS)
                 string? eventType = null;
@@ -119,6 +135,16 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                     {
                         causationId = causAttr.StringValue;
                     }
+                }
+
+                if (string.IsNullOrWhiteSpace(eventType))
+                {
+                    // Fallback: tentar extrair do payload bruto
+                    eventType = TryGetStringProperty(root, "EventType") ??
+                                TryGetStringProperty(root, "Type") ??
+                                TryGetStringProperty(root, "eventType");
+                    correlationId ??= TryGetStringProperty(root, "CorrelationId");
+                    causationId ??= TryGetStringProperty(root, "CausationId");
                 }
 
                 if (string.IsNullOrWhiteSpace(eventType))
@@ -159,6 +185,21 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
 
             // Tenta ler direto como string também
             return attribute.GetString();
+        }
+
+        private static string? TryGetStringProperty(JsonElement element, string propertyName)
+        {
+            if (!element.TryGetProperty(propertyName, out var valueElement))
+            {
+                return null;
+            }
+
+            return valueElement.ValueKind switch
+            {
+                JsonValueKind.String => valueElement.GetString(),
+                JsonValueKind.Number => valueElement.GetRawText(),
+                _ => null
+            };
         }
     }
 }

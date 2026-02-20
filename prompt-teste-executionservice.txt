@@ -1,0 +1,326 @@
+Guia de Teste - ExecutionService: Fluxo de Execução de Ordens de Serviço
+===========================================================================
+
+Olá time de ExecutionService!
+
+Agora que o deploy foi concluído com sucesso, vamos testar a responsabilidade principal do microserviço: INICIAR E EXECUTAR ORDENS DE SERVIÇO.
+
+FLUXO ESPERADO
+==============
+
+1. ExecutionService consome evento PaymentConfirmed da fila SQS
+2. Cria um ExecutionJob com status inicial "Queued"
+3. ExecutionWorker processa o job mudando status: Queued → Diagnosing → Repairing → Finished
+4. Publica evento ExecutionStarted (quando inicia o diagnóstico)
+5. Publica evento ExecutionFinished (quando completa o reparo)
+
+
+ETAPA 1: VERIFICAR O DEPLOYMENT E PODS
+=======================================
+
+Primeiro, verifique se o pod está rodando corretamente:
+
+    kubectl get pods -n default | grep execution
+
+Saída esperada:
+    executionservice-xxxxxxxxx-xxxxx   1/1     Running   0          5m
+
+Se o pod não estiver Running, verifique os eventos:
+
+    kubectl describe pod <pod-name> -n default
+
+Para ver os logs em tempo real:
+
+    kubectl logs -f <pod-name> -n default
+
+Procure por mensagens que indicam que os serviços foram iniciados:
+    ✅ SqsConsumerService iniciado
+    ✅ OutboxProcessor iniciado
+    ✅ ExecutionWorker iniciado
+
+
+ETAPA 2: CRIAR PORT-FORWARD PARA ACESSO LOCAL
+==============================================
+
+Crie um port-forward para acessar o pod localmente (assumindo que a API expõe porta 8080):
+
+    kubectl port-forward <pod-name> 5003:8080 -n default &
+
+Isso mapeia a porta 8080 do container para a porta 5003 local.
+
+Verifique se o port-forward está ativo:
+
+    curl http://localhost:5003/health || curl http://localhost:5003/
+
+Se retornar resposta, o port-forward está funcionando!
+
+
+ETAPA 3: OPÇÃO A - SIMULAR EVENTO PaymentConfirmed (TESTE ISOLADO)
+===================================================================
+
+Se o ExecutionService tem um endpoint de teste para simular o consumo de PaymentConfirmed:
+
+    curl -X POST http://localhost:5003/api/testing/payment-confirmed \
+      -H "Content-Type: application/json" \
+      -d '{
+        "osId": "9b8e1234-5678-90ab-cdef-123456789abc",
+        "paymentId": 999,
+        "providerPaymentId": "MP-TEST-999",
+        "status": "Confirmed"
+      }'
+
+Saída esperada:
+    {"message":"PaymentConfirmed processado com sucesso","jobId":123}
+
+OU, se não houver endpoint de teste, use a OPÇÃO B abaixo.
+
+
+ETAPA 3: OPÇÃO B - USAR EVENTO REAL DO SQS (TESTE DE INTEGRAÇÃO)
+=================================================================
+
+Se já existem mensagens PaymentConfirmed na fila SQS do BillingService:
+
+1. Verifique se o SqsConsumerService está consumindo:
+
+    kubectl logs -f <pod-name> -n default | grep "PaymentConfirmed"
+
+2. Você deve ver logs como:
+    [SqsConsumerService] Mensagem recebida: PaymentConfirmed
+    [PaymentConfirmedHandler] Processando pagamento confirmado para OS: 9b8e1234-5678-90ab-cdef-123456789abc
+    [PaymentConfirmedHandler] ExecutionJob criado com sucesso: JobId=123
+
+Se não houver mensagens na fila, peça ao BillingService para enviar uma nova executando:
+
+    # No BillingService
+    curl -X POST http://localhost:5001/api/billing/payments/<osId>/start
+
+
+ETAPA 4: MONITORAR LOGS DO ExecutionWorker
+===========================================
+
+Acompanhe os logs para ver a progressão do job:
+
+    kubectl logs -f <pod-name> -n default | grep -E "ExecutionWorker|ExecutionJob"
+
+Saída esperada (sequência):
+
+    [ExecutionWorker] Processando job 123: Status=Queued
+    [ExecutionWorker] Iniciando diagnóstico para OS 9b8e1234-5678-90ab-cdef-123456789abc
+    [ExecutionWorker] Job 123 mudou para: Diagnosing
+    ✅ OutboxMessage (ExecutionStarted) criada: OutboxMessageId=456
+    
+    [ExecutionWorker] Diagnóstico concluído, iniciando reparo
+    [ExecutionWorker] Job 123 mudou para: Repairing
+    
+    [ExecutionWorker] Reparo concluído com sucesso
+    [ExecutionWorker] Job 123 mudou para: Finished
+    ✅ OutboxMessage (ExecutionFinished) criada: OutboxMessageId=457
+
+
+ETAPA 5: VALIDAR PUBLICAÇÃO DE EVENTOS NO OUTBOX
+=================================================
+
+Verifique se o OutboxProcessor está publicando os eventos:
+
+    kubectl logs -f <pod-name> -n default | grep "OutboxProcessor"
+
+Saída esperada:
+
+    [OutboxProcessor] Processando 2 mensagens pendentes
+    [OutboxProcessor] Publicando mensagem 456: ExecutionStarted
+    ✅ OutboxMessage (ExecutionStarted) publicada com sucesso no SNS
+    [OutboxProcessor] Publicando mensagem 457: ExecutionFinished
+    ✅ OutboxMessage (ExecutionFinished) publicada com sucesso no SNS
+
+
+ETAPA 6: VERIFICAR DADOS NO BANCO (OPCIONAL)
+=============================================
+
+Se quiser validar os dados persistidos, faça port-forward do banco:
+
+    kubectl port-forward <postgres-pod> 5432:5432 -n default &
+
+Conecte via psql ou DBeaver e execute:
+
+    SELECT 
+        id, 
+        os_id, 
+        status, 
+        started_at, 
+        finished_at,
+        created_at
+    FROM execution_jobs
+    WHERE os_id = '9b8e1234-5678-90ab-cdef-123456789abc'
+    ORDER BY created_at DESC;
+
+Resultado esperado:
+    id  | os_id                                | status   | started_at          | finished_at         | created_at
+    ----+--------------------------------------+----------+---------------------+---------------------+---------------------
+    123 | 9b8e1234-5678-90ab-cdef-123456789abc | Finished | 2026-02-19 10:30:00 | 2026-02-19 10:32:00 | 2026-02-19 10:30:00
+
+
+ETAPA 7: VALIDAR EVENTOS NO SQS (OUTROS SERVIÇOS)
+==================================================
+
+Os eventos ExecutionStarted e ExecutionFinished devem estar disponíveis para outros serviços via SNS→SQS.
+
+Para verificar se foram publicados, monitore os logs de serviços consumidores (como NotificationService, se existir).
+
+Ou use AWS CLI para verificar mensagens nas filas:
+
+    aws sqs receive-message \
+      --queue-url https://sqs.sa-east-1.amazonaws.com/953082827427/notification-events \
+      --region sa-east-1 \
+      --max-number-of-messages 10
+
+Procure por mensagens com EventType: ExecutionStarted e ExecutionFinished.
+
+
+CHECKLIST DE VALIDAÇÃO
+=======================
+
+[ ] Pod está Running (1/1)
+[ ] Port-forward criado com sucesso (porta 5003)
+[ ] Endpoint de saúde responde (GET /health)
+[ ] PaymentConfirmed consumido da fila (via logs)
+[ ] ExecutionJob criado com status Queued (via logs)
+[ ] ExecutionWorker processou: Queued → Diagnosing (via logs)
+[ ] Evento ExecutionStarted publicado no OutboxProcessor (via logs)
+[ ] ExecutionWorker processou: Diagnosing → Repairing (via logs)
+[ ] ExecutionWorker processou: Repairing → Finished (via logs)
+[ ] Evento ExecutionFinished publicado no OutboxProcessor (via logs)
+[ ] Registro criado na tabela execution_jobs com status Finished (via DB)
+[ ] Eventos disponíveis no SNS/SQS para consumo de outros serviços
+
+
+COMANDOS ÚTEIS RESUMIDOS
+=========================
+
+# Ver pods
+kubectl get pods -n default | grep execution
+
+# Logs em tempo real
+kubectl logs -f <pod-name> -n default
+
+# Filtrar logs específicos
+kubectl logs -f <pod-name> -n default | grep -E "ExecutionWorker|Outbox|PaymentConfirmed"
+
+# Port-forward
+kubectl port-forward <pod-name> 5003:8080 -n default &
+
+# Testar API
+curl http://localhost:5003/health
+
+# Simular PaymentConfirmed (se endpoint existir)
+curl -X POST http://localhost:5003/api/testing/payment-confirmed \
+  -H "Content-Type: application/json" \
+  -d '{"osId":"9b8e1234-5678-90ab-cdef-123456789abc","paymentId":999,"status":"Confirmed"}'
+
+# Matar port-forward
+pkill -f "port-forward.*5003"
+
+
+TROUBLESHOOTING
+===============
+
+PROBLEMA 1: Pod não sobe (CrashLoopBackOff)
+-------------------------------------------
+Verifique os logs:
+    kubectl logs <pod-name> -n default --previous
+
+Causas comuns:
+- Variáveis de ambiente faltando (AWS_REGION, DB_HOST, etc.)
+- Credenciais AWS inválidas
+- Banco de dados inacessível
+
+
+PROBLEMA 2: PaymentConfirmed não é consumido
+---------------------------------------------
+Verifique:
+1. SqsConsumerService está rodando? (logs devem mostrar "SqsConsumerService iniciado")
+2. Fila SQS está correta no ConfigMap? (AWS_SQS_QUEUE_EXECUTION)
+3. Credenciais AWS estão corretas no Secret?
+4. Região AWS está correta? (aws-region: sa-east-1)
+
+Debug:
+    kubectl logs -f <pod-name> -n default | grep -i "sqs\|consumer"
+
+
+PROBLEMA 3: ExecutionWorker não processa jobs
+----------------------------------------------
+Verifique:
+1. ExecutionWorker está rodando? (logs devem mostrar "ExecutionWorker iniciado")
+2. Job foi criado no banco? (SELECT * FROM execution_jobs)
+3. Há erros no log do worker?
+
+Debug:
+    kubectl logs -f <pod-name> -n default | grep -i "worker\|job"
+
+
+PROBLEMA 4: Eventos não são publicados no SNS
+----------------------------------------------
+Verifique:
+1. OutboxProcessor está rodando? (logs devem mostrar "OutboxProcessor iniciado")
+2. Mensagens foram criadas na tabela outbox_messages?
+3. ARNs do SNS estão corretos no ConfigMap?
+
+Debug:
+    kubectl logs -f <pod-name> -n default | grep -i "outbox\|sns"
+
+
+ESTRUTURA DE EVENTOS ESPERADOS
+===============================
+
+ExecutionStarted:
+-----------------
+{
+  "EventType": "ExecutionStarted",
+  "OsId": "9b8e1234-5678-90ab-cdef-123456789abc",
+  "ExecutionJobId": 123,
+  "StartedAt": "2026-02-19T10:30:00Z",
+  "CorrelationId": "626bd763-c258-4563-9dc5-ac10191b9c69",
+  "CausationId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+}
+
+ExecutionFinished:
+------------------
+{
+  "EventType": "ExecutionFinished",
+  "OsId": "9b8e1234-5678-90ab-cdef-123456789abc",
+  "ExecutionJobId": 123,
+  "Status": "Completed",
+  "FinishedAt": "2026-02-19T10:32:00Z",
+  "CorrelationId": "626bd763-c258-4563-9dc5-ac10191b9c69",
+  "CausationId": "626bd763-c258-4563-9dc5-ac10191b9c69"
+}
+
+
+TESTE E2E COMPLETO (COM BILLINGSERVICE)
+========================================
+
+Para validar a integração completa:
+
+1. No OSService, crie uma OS (status: Aberta)
+2. No BillingService, gere orçamento para a OS
+3. Aprove o orçamento (muda para Aprovado)
+4. Inicie pagamento (BillingService publica PaymentConfirmed)
+5. ExecutionService consome PaymentConfirmed → cria job → executa → publica eventos
+6. Valide CorrelationId em todos os eventos (deve ser o mesmo da OS original)
+
+Comando trace E2E:
+    kubectl logs -f <billing-pod> -n default | grep <correlation-id> &
+    kubectl logs -f <execution-pod> -n default | grep <correlation-id> &
+
+
+SUCESSO!
+========
+
+Se todos os checkpoints foram validados, o ExecutionService está funcionando corretamente! 🎉
+
+Os próximos passos seriam:
+- Testes de carga (múltiplas OSs simultâneas)
+- Testes de falha (job falha no diagnóstico/reparo)
+- Monitoramento contínuo (Prometheus/Grafana)
+- Alertas (quando jobs ficam muito tempo em Queued/Diagnosing)
+
+Qualquer dúvida, só chamar!

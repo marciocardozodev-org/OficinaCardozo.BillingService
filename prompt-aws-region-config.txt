@@ -1,0 +1,216 @@
+Configuração de AWS Region no Pipeline CI/CD - BillingService para ExecutionService
+===================================================================================
+
+Olá time de ExecutionService!
+
+O BillingService identificou que vocês estão com dificuldades na configuração da AWS region no CI/CD. Vou explicar como fazemos aqui e vocês podem replicar.
+
+ONDE CONFIGURAMOS A AWS REGION
+===============================
+
+1. NO WORKFLOW DO GITHUB ACTIONS (.github/workflows/*.yml)
+----------------------------------------------------------
+
+Usamos a action oficial da AWS para configurar as credenciais:
+
+    - name: Configurar credenciais AWS para Terraform
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: sa-east-1  # <-- AQUI definimos a região
+
+PONTOS IMPORTANTES:
+- A action aws-actions/configure-aws-credentials@v4 configura automaticamente as variáveis de ambiente AWS_REGION, AWS_DEFAULT_REGION, AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY
+- Todos os comandos AWS CLI executados DEPOIS deste step já usam automaticamente a região configurada
+- Não precisa exportar manualmente as variáveis de ambiente
+
+
+2. NOS COMANDOS AWS CLI SUBSEQUENTES
+-------------------------------------
+
+Depois do step de configuração de credenciais, todos os comandos AWS CLI já funcionam com a região correta:
+
+    - name: Gerar kubeconfig do EKS
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'
+      run: |
+        export CLUSTER_NAME="oficina-cardozo-eks"
+        export AWS_REGION="sa-east-1"  # Opcional, mas deixamos explícito
+        aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
+
+    - name: Baixar terraform-outputs.json do S3
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'
+      run: |
+        aws s3 cp s3://oficina-cardozo-shared-artifacts/terraform/terraform-outputs.json ../terraform-outputs.json
+        # ^ Não precisa especificar --region, já está configurado
+
+
+3. NO CONFIGMAP DO KUBERNETES (deploy/k8s/aws-messaging-config.yaml)
+---------------------------------------------------------------------
+
+Para a aplicação em runtime no Kubernetes, criamos um ConfigMap com a região:
+
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: aws-messaging-config
+      namespace: default
+    data:
+      AWS_REGION: sa-east-1  # <-- AQUI definimos para runtime
+      AWS_SQS_QUEUE_BILLING: https://sqs.sa-east-1.amazonaws.com/953082827427/billing-events
+      AWS_SNS_TOPIC_PAYMENTCONFIRMED: arn:aws:sns:sa-east-1:953082827427:payment-confirmed
+      # ... outros recursos AWS com a região explícita nas URLs/ARNs
+
+OBSERVAÇÃO: Note que a região aparece explicitamente nas URLs do SQS e nos ARNs do SNS.
+
+
+4. NO DEPLOYMENT DO KUBERNETES (referências ao ConfigMap)
+----------------------------------------------------------
+
+No deployment.yaml, injetamos as variáveis de ambiente do ConfigMap:
+
+    spec:
+      containers:
+      - name: billingservice
+        envFrom:
+        - configMapRef:
+            name: aws-messaging-config  # <-- Injeta AWS_REGION e outras configs
+        - secretRef:
+            name: aws-messaging-secrets  # Injeta credenciais AWS
+
+
+CHECKLIST PARA IMPLEMENTAÇÃO NO EXECUTIONSERVICE
+=================================================
+
+1. No workflow do GitHub Actions:
+   [ ] Adicionar step com aws-actions/configure-aws-credentials@v4
+   [ ] Definir aws-region: sa-east-1 no step
+   [ ] Garantir que o step está ANTES de qualquer comando AWS CLI
+
+2. Criar ConfigMap para runtime:
+   [ ] Criar deploy/k8s/aws-messaging-config.yaml com AWS_REGION: sa-east-1
+   [ ] Incluir URLs completas do SQS (com região) e ARNs do SNS
+   [ ] Aplicar o ConfigMap no step do workflow: kubectl apply -f deploy/k8s/aws-messaging-config.yaml
+
+3. No Deployment:
+   [ ] Adicionar envFrom para referenciar o ConfigMap aws-messaging-config
+   [ ] Adicionar envFrom para referenciar o Secret com credenciais AWS
+
+4. Secrets no GitHub:
+   [ ] Verificar se AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY estão configurados nos Secrets do repositório
+
+
+EXEMPLO DE ORDEM DOS STEPS NO WORKFLOW
+=======================================
+
+    # 1. Configurar credenciais AWS (PRIMEIRO)
+    - name: Configurar credenciais AWS
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: sa-east-1
+
+    # 2. Comandos AWS CLI já funcionam (DEPOIS)
+    - name: Baixar arquivos do S3
+      run: aws s3 cp s3://bucket/file.json ./
+
+    # 3. Configurar kubeconfig
+    - name: Gerar kubeconfig do EKS
+      run: aws eks update-kubeconfig --region sa-east-1 --name oficina-cardozo-eks
+
+    # 4. Aplicar ConfigMap com AWS_REGION para runtime
+    - name: Aplicar ConfigMap aws-messaging-config
+      run: kubectl apply -f deploy/k8s/aws-messaging-config.yaml
+
+    # 5. Aplicar Secret com credenciais
+    - name: Garantir secret aws-messaging-secrets
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      run: |
+        kubectl create secret generic aws-messaging-secrets \
+          --from-literal=AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+          --from-literal=AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+          -n default --dry-run=client -o yaml | kubectl apply -f -
+
+    # 6. Deploy da aplicação (ÚLTIMO)
+    - name: Deploy no Kubernetes
+      run: kubectl apply -f deploy/k8s/deployment.yaml
+
+
+ERROS COMUNS A EVITAR
+======================
+
+1. Não configurar credenciais antes dos comandos AWS CLI
+   → Erro: "Unable to locate credentials"
+
+2. Não definir aws-region no step de configuração
+   → Erro: "Region not found"
+
+3. Esquecer de criar o ConfigMap
+   → Aplicação não encontra AWS_REGION em runtime
+
+4. Não injetar o ConfigMap no Deployment
+   → Variáveis de ambiente não disponíveis no container
+
+
+EXEMPLO COMPLETO DO CONFIGMAP (aws-messaging-config.yaml)
+==========================================================
+
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: aws-messaging-config
+      namespace: default
+    data:
+      AWS_REGION: sa-east-1
+      AWS_SQS_QUEUE_EXECUTION: https://sqs.sa-east-1.amazonaws.com/953082827427/execution-events
+      AWS_SQS_QUEUE_DLQ_EXECUTION: https://sqs.sa-east-1.amazonaws.com/953082827427/execution-events-dlq
+      AWS_SNS_TOPIC_EXECUTIONSTARTED: arn:aws:sns:sa-east-1:953082827427:execution-started
+      AWS_SNS_TOPIC_EXECUTIONFINISHED: arn:aws:sns:sa-east-1:953082827427:execution-finished
+
+
+EXEMPLO COMPLETO DO DEPLOYMENT COM CONFIGMAP
+=============================================
+
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: executionservice
+      namespace: default
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: executionservice
+      template:
+        metadata:
+          labels:
+            app: executionservice
+        spec:
+          containers:
+          - name: executionservice
+            image: marciocardozodev/oficinacardozo-executionservice:latest
+            ports:
+            - containerPort: 8080
+            envFrom:
+            - configMapRef:
+                name: aws-messaging-config
+            - secretRef:
+                name: aws-messaging-secrets
+            - configMapRef:
+                name: executionservice-config
+            - secretRef:
+                name: executionservice-db-secret
+
+
+REFERÊNCIAS
+===========
+
+- Action AWS Credentials: https://github.com/aws-actions/configure-aws-credentials
+- Workflow completo do BillingService: .github/workflows/ci-cd-billingservice.yml
+- ConfigMap do BillingService: deploy/k8s/aws-messaging-config.yaml
+
+Qualquer dúvida, só chamar!

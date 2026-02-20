@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Threading.Tasks;
+using Npgsql;
 using OFICINACARDOZO.BILLINGSERVICE;
 using OFICINACARDOZO.BILLINGSERVICE.Application;
 using OFICINACARDOZO.BILLINGSERVICE.Contracts.Events;
@@ -33,6 +34,17 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                     "Processando OsCreated para OS {OsId} com CorrelationId {CorrelationId}",
                     envelope.Payload.OsId,
                     envelope.CorrelationId);
+
+                // ✅ Idempotencia: se ja existe orcamento para a OS, nao recriar
+                var existing = await _orcamentoService.GetBudgetByOsIdAsync(envelope.Payload.OsId);
+                if (existing != null)
+                {
+                    _logger.LogInformation(
+                        "Orcamento ja existe para OS {OsId} (Id={OrcamentoId}). Ignorando OsCreated.",
+                        envelope.Payload.OsId,
+                        existing.Id);
+                    return;
+                }
 
                 // ✅ TRANSACTIONAL OUTBOX PATTERN - FASE 1
                 // Criar Orçamento + OutboxMessage em UMA transação
@@ -90,12 +102,33 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
             }
             catch (Exception ex)
             {
+                // ✅ IDEMPOTENCIA: Se orcamento ja existe, ignorar (duplicate key)
+                if (IsDuplicateKey(ex))
+                {
+                    _logger.LogInformation(
+                        "Orçamento para OS {OsId} já existe. Ignorando reprocessamento (idempotente).",
+                        envelope.Payload.OsId);
+                    return;  // ✅ Não relança - tratar como sucesso
+                }
+                
                 _logger.LogError(
                     ex,
                     "Erro ao processar OsCreated para OS {OsId}",
                     envelope.Payload.OsId);
-                throw;
+                throw;  // ❌ Relança apenas para erros reais
             }
+        }
+
+        private static bool IsDuplicateKey(Exception ex)
+        {
+            if (ex is PostgresException pg && pg.SqlState == PostgresErrorCodes.UniqueViolation)
+            {
+                return true;
+            }
+
+            var message = ex.InnerException?.Message ?? ex.Message;
+            return message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase) ||
+                   message.Contains("orcamento_os_id_key", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

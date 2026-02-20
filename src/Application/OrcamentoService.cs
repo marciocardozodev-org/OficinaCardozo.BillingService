@@ -36,6 +36,14 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
             return await _db.Orcamentos.FirstOrDefaultAsync(o => o.OsId == osId);
         }
 
+        /// <summary>
+        /// Alias para GetBudgetByOsIdAsync mantendo nomenclatura em português
+        /// </summary>
+        public async Task<Orcamento?> ObterOrcamentoPorOsIdAsync(Guid osId)
+        {
+            return await GetBudgetByOsIdAsync(osId);
+        }
+
         public async Task<Orcamento> AprovaBudgetAsync(Guid osId, Guid? correlationId = null, Guid? causationId = null)
         {
             var orcamento = await GetBudgetByOsIdAsync(osId);

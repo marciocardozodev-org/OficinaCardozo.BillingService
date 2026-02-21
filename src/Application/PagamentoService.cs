@@ -170,7 +170,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 OrcamentoId = orcamentoId,
                 Valor = valor,
                 Metodo = metodo,
-                Status = StatusPagamento.Confirmado,
+                Status = StatusPagamento.Pendente,  // ✅ Manter como Pendente, não Confirmado
                 CorrelationId = correlationId,
                 CausationId = causationId,
                 CriadoEm = DateTime.UtcNow,
@@ -178,6 +178,37 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
             };
             _context.Pagamentos.Add(pagamento);
             _context.SaveChanges();
+
+            // ✅ Criar evento PaymentPending para publicação em SNS
+            var paymentPendingEvent = new PaymentPending
+            {
+                PaymentId = LongToGuid(pagamento.Id),
+                OsId = osId,
+                Status = PaymentStatus.Pending,
+                Amount = valor,
+                ProviderPaymentId = "", // Vazio inicialmente
+                PaymentMethod = metodo
+            };
+
+            var outboxMessage = new OutboxMessage
+            {
+                AggregateId = osId,
+                AggregateType = "OrderService",
+                EventType = nameof(PaymentPending),
+                Payload = JsonSerializer.Serialize(paymentPendingEvent),
+                CreatedAt = DateTime.UtcNow,
+                Published = false,
+                CorrelationId = correlationId,
+                CausationId = causationId
+            };
+
+            _context.Set<OutboxMessage>().Add(outboxMessage);
+            _context.SaveChanges();
+
+            _logger.LogInformation(
+                "Pagamento {PaymentId} registrado como Pendente. PaymentPending event enfileirado para publicação.",
+                pagamento.Id);
+
             return pagamento;
         }
 

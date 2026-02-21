@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using OFICINACARDOZO.BILLINGSERVICE.Application;
 using OFICINACARDOZO.BILLINGSERVICE.Domain;
 

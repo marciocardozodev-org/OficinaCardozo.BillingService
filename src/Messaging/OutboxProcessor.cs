@@ -135,6 +135,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
                 nameof(BudgetGenerated) => snsTopics.BudgetGeneratedTopicArn,
                 nameof(BudgetApproved) => snsTopics.BudgetApprovedTopicArn,
                 nameof(BudgetRejected) => snsTopics.BudgetRejectedTopicArn,
+                nameof(PaymentPending) => snsTopics.PaymentPendingTopicArn,
                 nameof(PaymentConfirmed) => snsTopics.PaymentConfirmedTopicArn,
                 nameof(PaymentFailed) => snsTopics.PaymentFailedTopicArn,
                 nameof(PaymentReversed) => snsTopics.PaymentReversedTopicArn,
@@ -203,6 +204,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
         public string BudgetGeneratedTopicArn { get; set; } = string.Empty;
         public string BudgetApprovedTopicArn { get; set; } = string.Empty;
         public string BudgetRejectedTopicArn { get; set; } = string.Empty;
+        public string PaymentPendingTopicArn { get; set; } = string.Empty;
         public string PaymentConfirmedTopicArn { get; set; } = string.Empty;
         public string PaymentFailedTopicArn { get; set; } = string.Empty;
         public string PaymentReversedTopicArn { get; set; } = string.Empty;

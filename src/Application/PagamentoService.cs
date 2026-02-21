@@ -60,6 +60,38 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 "Pagamento registrado com ID {PaymentId} em estado Pendente",
                 pagamento.Id);
 
+            // 1.5 Criar evento PaymentPending para ser publicado em SNS
+            var paymentPendingEvent = new PaymentPending
+            {
+                PaymentId = LongToGuid(pagamento.Id),
+                OsId = osId,
+                Status = PaymentStatus.Pending,
+                Amount = valor,
+                ProviderPaymentId = "", // Ainda não temos do provider
+                PaymentMethod = paymentMethod
+            };
+
+            var pendingEventCausationId = Guid.NewGuid();
+
+            var pendingOutboxMessage = new OutboxMessage
+            {
+                AggregateId = osId,
+                AggregateType = "OrderService",
+                EventType = nameof(PaymentPending),
+                Payload = JsonSerializer.Serialize(paymentPendingEvent),
+                CreatedAt = DateTime.UtcNow,
+                Published = false,
+                CorrelationId = correlationId,
+                CausationId = pendingEventCausationId
+            };
+
+            _context.Set<OutboxMessage>().Add(pendingOutboxMessage);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "Evento PaymentPending criado e enfileirado para publicação. CorrelationId: {CorrelationId}",
+                correlationId);
+
             // 2. Chamar serviço de pagamento (Mercado Pago real ou mock)
             var providerPaymentId = await _mercadoPago.InitiatePaymentAsync(
                 osId,
@@ -68,48 +100,23 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 paymentMethod,
                 $"Pagamento PIX para OS {osId}");
 
-            // 3. Atualizar o registro com resultado e publicar evento apropriado
+            // 3. Atualizar o registro com resultado
             if (!string.IsNullOrEmpty(providerPaymentId))
             {
-                // ✅ Pagamento confirmado
-                pagamento.Status = StatusPagamento.Confirmado;
+                // ⏳ Para PIX: Registrar ProviderPaymentId mas MANTER em Pendente
+                // A confirmação virá via webhook do Mercado Pago
                 pagamento.ProviderPaymentId = providerPaymentId;
                 pagamento.AtualizadoEm = DateTime.UtcNow;
+                // ⚠️ Status permanece Pendente até webhook confirmar
                 _context.Pagamentos.Update(pagamento);
 
-                // Criar evento PaymentConfirmed
-                var paymentConfirmedEvent = new PaymentConfirmed
-                {
-                    PaymentId = LongToGuid(pagamento.Id),
-                    OsId = osId,
-                    Status = PaymentStatus.Confirmed,
-                    Amount = valor,
-                    ProviderPaymentId = providerPaymentId
-                };
-
-                var eventCausationId = Guid.NewGuid();
-
-                var outboxMessage = new OutboxMessage
-                {
-                    AggregateId = osId,
-                    AggregateType = "OrderService",
-                    EventType = nameof(PaymentConfirmed),
-                    Payload = JsonSerializer.Serialize(paymentConfirmedEvent),
-                    CreatedAt = DateTime.UtcNow,
-                    Published = false,
-                    CorrelationId = correlationId,
-                    CausationId = eventCausationId
-                };
-
-                _context.Set<OutboxMessage>().Add(outboxMessage);
-
                 _logger.LogInformation(
-                    "Pagamento confirmado. ProviderPaymentId: {PaymentId}, OutboxMessage criada",
+                    "Pagamento registrado como Pendente. ProviderPaymentId: {PaymentId}, aguardando webhook",
                     providerPaymentId);
             }
             else
             {
-                // ❌ Pagamento falhou
+                // ❌ Falha ao criar pagamento no Mercado Pago
                 pagamento.Status = StatusPagamento.Falhou;
                 pagamento.AtualizadoEm = DateTime.UtcNow;
                 _context.Pagamentos.Update(pagamento);
@@ -120,7 +127,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                     PaymentId = LongToGuid(pagamento.Id),
                     OsId = osId,
                     Status = PaymentStatus.Failed,
-                    Reason = "Falha na autorização do provedor"
+                    Reason = "Falha ao gerar QR Code PIX no Mercado Pago"
                 };
 
                 var eventCausationId = Guid.NewGuid();
@@ -140,7 +147,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 _context.Set<OutboxMessage>().Add(outboxMessage);
 
                 _logger.LogWarning(
-                    "Pagamento falhou para OS {OsId}. PaymentFailed enfileirado",
+                    "Falha ao gerar QR Code PIX para OS {OsId}. PaymentFailed enfileirado",
                     osId);
             }
 

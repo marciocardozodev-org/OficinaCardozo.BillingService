@@ -53,7 +53,26 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API.Billing
                     "Iniciando pagamento (HTTP) para OS {OsId}, Valor: {Valor}, Ambiente: {Ambiente}",
                     osId, valor, isSandbox ? "SANDBOX" : "PRODUCAO");
 
-                var paymentRequest = new
+                var paymentMethodId = MapMetodoToPagamentoMP(metodo);
+                
+                // Para PIX, não precisa de token. Para outros métodos (cartão), precisa
+                var paymentRequest = paymentMethodId == "pix" ? new
+                {
+                    transaction_amount = valor,
+                    description = description ?? $"Pagamento PIX para OS {osId}",
+                    payment_method_id = paymentMethodId,
+                    payer = new
+                    {
+                        email = _configuration["MERCADOPAGO_TEST_EMAIL"] ?? "test@example.com"
+                    },
+                    installments = 1,
+                    external_reference = osId.ToString(),
+                    metadata = new
+                    {
+                        osId = osId.ToString(),
+                        orcamentoId = orcamentoId
+                    }
+                } : new
                 {
                     transaction_amount = valor,
                     description = description ?? $"Pagamento para OS {osId}",
@@ -61,7 +80,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API.Billing
                     {
                         email = _configuration["MERCADOPAGO_TEST_EMAIL"] ?? "test@example.com"
                     },
-                    payment_method_id = MapMetodoToPagamentoMP(metodo),
+                    payment_method_id = paymentMethodId,
                     token = _configuration["MERCADOPAGO_TEST_CARD_TOKEN"] ?? "",
                     installments = 1,
                     external_reference = osId.ToString(),

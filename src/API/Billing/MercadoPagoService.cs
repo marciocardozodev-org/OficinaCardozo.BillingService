@@ -55,41 +55,23 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API.Billing
 
                 var paymentMethodId = MapMetodoToPagamentoMP(metodo);
                 
-                // Para PIX, não precisa de token. Para outros métodos (cartão), precisa
-                var paymentRequest = paymentMethodId == "pix" ? new
+                // Construir payload dinamicamente (PIX não precisa de token)
+                var paymentRequest = new Dictionary<string, object>
                 {
-                    transaction_amount = valor,
-                    description = description ?? $"Pagamento PIX para OS {osId}",
-                    payment_method_id = paymentMethodId,
-                    payer = new
-                    {
-                        email = _configuration["MERCADOPAGO_TEST_EMAIL"] ?? "test@example.com"
-                    },
-                    installments = 1,
-                    external_reference = osId.ToString(),
-                    metadata = new
-                    {
-                        osId = osId.ToString(),
-                        orcamentoId = orcamentoId
-                    }
-                } : new
-                {
-                    transaction_amount = valor,
-                    description = description ?? $"Pagamento para OS {osId}",
-                    payer = new
-                    {
-                        email = _configuration["MERCADOPAGO_TEST_EMAIL"] ?? "test@example.com"
-                    },
-                    payment_method_id = paymentMethodId,
-                    token = _configuration["MERCADOPAGO_TEST_CARD_TOKEN"] ?? "",
-                    installments = 1,
-                    external_reference = osId.ToString(),
-                    metadata = new
-                    {
-                        osId = osId.ToString(),
-                        orcamentoId = orcamentoId
-                    }
+                    { "transaction_amount", valor },
+                    { "description", description ?? $"Pagamento para OS {osId}" },
+                    { "payment_method_id", paymentMethodId },
+                    { "payer", new { email = _configuration["MERCADOPAGO_TEST_EMAIL"] ?? "test@example.com" } },
+                    { "installments", 1 },
+                    { "external_reference", osId.ToString() },
+                    { "metadata", new { osId = osId.ToString(), orcamentoId = orcamentoId } }
                 };
+
+                // Adicionar token apenas para métodos que não são PIX
+                if (paymentMethodId != "pix")
+                {
+                    paymentRequest["token"] = _configuration["MERCADOPAGO_TEST_CARD_TOKEN"] ?? "";
+                }
 
                 var jsonContent = JsonSerializer.Serialize(paymentRequest);
                 

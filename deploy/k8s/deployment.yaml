@@ -84,6 +84,16 @@ spec:
             configMapKeyRef:
               name: aws-messaging-config
               key: AWS_SNS_TOPIC_BUDGETAPPROVED
+        - name: AWS_SNS_TOPIC_BUDGETREJECTED
+          valueFrom:
+            configMapKeyRef:
+              name: aws-messaging-config
+              key: AWS_SNS_TOPIC_BUDGETREJECTED
+        - name: AWS_SNS_TOPIC_PAYMENTPENDING
+          valueFrom:
+            configMapKeyRef:
+              name: aws-messaging-config
+              key: AWS_SNS_TOPIC_PAYMENTPENDING
         - name: AWS_SNS_TOPIC_PAYMENTCONFIRMED
           valueFrom:
             configMapKeyRef:

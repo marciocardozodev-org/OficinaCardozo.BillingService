@@ -58,6 +58,44 @@ builder.Services.AddSwaggerGen(options =>
 });
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.PagamentoService>();
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.AtualizacaoStatusOsService>();
+
+// Mercado Pago Configuration
+var mpAccessToken = Environment.GetEnvironmentVariable("MERCADOPAGO_ACCESS_TOKEN") ?? "";
+var mpIsSandbox = Environment.GetEnvironmentVariable("MERCADOPAGO_IS_SANDBOX") ?? "true";
+var mpTestEmail = Environment.GetEnvironmentVariable("MERCADOPAGO_TEST_EMAIL") ?? "test@example.com";
+var mpTestCardToken = Environment.GetEnvironmentVariable("MERCADOPAGO_TEST_CARD_TOKEN") ?? "";
+
+builder.Services.Configure<OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoOptions>(options =>
+{
+    options.AccessToken = mpAccessToken;
+    options.IsSandbox = bool.Parse(mpIsSandbox);
+    options.TestEmail = mpTestEmail;
+    options.TestCardToken = mpTestCardToken;
+});
+
+// HttpClient para Mercado Pago
+builder.Services.AddHttpClient("MercadoPago")
+    .ConfigureHttpClient(client => 
+    {
+        client.Timeout = TimeSpan.FromSeconds(30);
+    });
+
+// Registrar implementação REAL (trocar para MercadoPagoMockService se necessário)
+builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.API.Billing.IMercadoPagoService>(sp =>
+{
+    if (mpIsSandbox == "true" && string.IsNullOrEmpty(mpAccessToken))
+    {
+        // Usar mock se sandbox e sem token configurado
+        return new OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoMockService(
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoMockService>>());
+    }
+    return new OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoService(
+        sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoService>(),
+        sp.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>(),
+        sp.GetRequiredService<System.Net.Http.IHttpClientFactory>());
+});
+
+builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoWebhookHandler>();
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.OrcamentoService>();
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.ServiceOrchestrator>();
 

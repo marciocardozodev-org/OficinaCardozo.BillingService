@@ -59,42 +59,53 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.PagamentoService>();
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.AtualizacaoStatusOsService>();
 
-// Mercado Pago Configuration
-var mpAccessToken = Environment.GetEnvironmentVariable("MERCADOPAGO_ACCESS_TOKEN") ?? "";
-var mpIsSandbox = Environment.GetEnvironmentVariable("MERCADOPAGO_IS_SANDBOX") ?? "true";
-var mpTestEmail = Environment.GetEnvironmentVariable("MERCADOPAGO_TEST_EMAIL") ?? "test@example.com";
-var mpTestCardToken = Environment.GetEnvironmentVariable("MERCADOPAGO_TEST_CARD_TOKEN") ?? "";
+// ========== MERCADO PAGO CONFIGURATION ==========
+// Padrão: Environment.GetEnvironmentVariable("CHAVE") ?? "valor_padrao"
+// Segue o mesmo padrão usado para AWS, DB, etc.
 
+// Variáveis de configuração do Mercado Pago
+var mpAccessToken = Environment.GetEnvironmentVariable("MERCADOPAGO_ACCESS_TOKEN") ?? "";
+var mpIsSandboxStr = Environment.GetEnvironmentVariable("MERCADOPAGO_IS_SANDBOX") ?? "true";
+var mpTestEmail = Environment.GetEnvironmentVariable("MERCADOPAGO_TEST_EMAIL") ?? "test@example.com";
+var mpTestCardToken = Environment.GetEnvironmentVariable("MERCADOPAGO_TEST_CARD_TOKEN") ?? "4111111111111111";
+
+// Parse sandbox flag
+var mpIsSandbox = bool.Parse(mpIsSandboxStr);
+
+// Registrar Options no container
 builder.Services.Configure<OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoOptions>(options =>
 {
     options.AccessToken = mpAccessToken;
-    options.IsSandbox = bool.Parse(mpIsSandbox);
+    options.IsSandbox = mpIsSandbox;
     options.TestEmail = mpTestEmail;
     options.TestCardToken = mpTestCardToken;
 });
 
-// HttpClient para Mercado Pago
+// HttpClient dedicado para Mercado Pago (30s timeout, como padrão)
 builder.Services.AddHttpClient("MercadoPago")
     .ConfigureHttpClient(client => 
     {
         client.Timeout = TimeSpan.FromSeconds(30);
     });
 
-// Registrar implementação REAL (trocar para MercadoPagoMockService se necessário)
+// Registrar implementação: REAL se token configurado, MOCK se não
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.API.Billing.IMercadoPagoService>(sp =>
 {
-    if (mpIsSandbox == "true" && string.IsNullOrEmpty(mpAccessToken))
+    // Se ambiente sandbox E sem token = usar MOCK
+    if (mpIsSandbox && string.IsNullOrEmpty(mpAccessToken))
     {
-        // Usar mock se sandbox e sem token configurado
         return new OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoMockService(
             sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoMockService>>());
     }
+    
+    // Caso contrário = usar implementação REAL (SDK)
     return new OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoService(
-        sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoService>(),
+        sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoService>>(),
         sp.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>(),
         sp.GetRequiredService<System.Net.Http.IHttpClientFactory>());
 });
 
+// Webhook handler para notificações do Mercado Pago
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoWebhookHandler>();
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.OrcamentoService>();
 builder.Services.AddScoped<OFICINACARDOZO.BILLINGSERVICE.Application.ServiceOrchestrator>();
@@ -166,6 +177,15 @@ builder.Services.AddDbContext<BillingDbContext>(options =>
     options.UseNpgsql(postgresConnectionString));
 
 var app = builder.Build();
+
+// Log de configuração do Mercado Pago após build
+var configLogger = app.Services.GetRequiredService<ILogger<Program>>();
+configLogger.LogInformation(
+    "🔐 Mercado Pago Configuration Loaded: IsSandbox={IsSandbox}, HasAccessToken={HasAccessToken}, UseRealService={UseReal}",
+    mpIsSandbox,
+    !string.IsNullOrEmpty(mpAccessToken),
+    !string.IsNullOrEmpty(mpAccessToken) ? "SIM (MercadoPagoService)" : "NÃO (MercadoPagoMockService)"
+);
 
 if (app.Environment.IsDevelopment())
 {

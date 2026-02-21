@@ -36,9 +36,14 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
                     {
                         OsId = ParseOsId(payloadElement),
                         Description = payloadElement.TryGetProperty("Description", out var description)
+                            || payloadElement.TryGetProperty("description", out description)
+                            || payloadElement.TryGetProperty("descricao", out description)
                             ? description.GetString() ?? string.Empty
                             : string.Empty,
-                        CreatedAt = TryGetDateTime(payloadElement, "CreatedAt") ?? DateTime.UtcNow
+                        CreatedAt = TryGetDateTime(payloadElement, "CreatedAt")
+                            ?? TryGetDateTime(payloadElement, "createdAt")
+                            ?? TryGetDateTime(payloadElement, "timestamp")
+                            ?? DateTime.UtcNow
                     };
 
                     var envelope = new EventEnvelope<OsCreated>
@@ -65,7 +70,9 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
 
         private static Guid ParseOsId(JsonElement payloadElement)
         {
-            if (!payloadElement.TryGetProperty("OsId", out var osIdElement))
+            // Tenta ambos: OsId (Pascal) e osId (camel) para compatibilidade
+            if (!payloadElement.TryGetProperty("OsId", out var osIdElement) &&
+                !payloadElement.TryGetProperty("osId", out osIdElement))
             {
                 return Guid.Empty;
             }

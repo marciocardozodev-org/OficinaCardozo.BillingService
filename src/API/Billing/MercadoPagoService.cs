@@ -39,14 +39,14 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API.Billing
         {
             try
             {
-                var accessToken = _configuration["MercadoPago:AccessToken"];
+                var accessToken = _configuration["MERCADOPAGO_ACCESS_TOKEN"];
                 if (string.IsNullOrEmpty(accessToken))
                 {
                     _logger.LogWarning("MercadoPago AccessToken não configurado. Retornando null.");
                     return null;
                 }
 
-                var isSandbox = _configuration.GetValue<bool>("MercadoPago:IsSandbox", true);
+                var isSandbox = _configuration.GetValue<bool>("MERCADOPAGO_IS_SANDBOX", true);
                 var baseUrl = isSandbox ? SandboxBaseUrl : ProductionBaseUrl;
 
                 _logger.LogInformation(
@@ -59,10 +59,10 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API.Billing
                     description = description ?? $"Pagamento para OS {osId}",
                     payer = new
                     {
-                        email = _configuration["MercadoPago:TestEmail"] ?? "test@example.com"
+                        email = _configuration["MERCADOPAGO_TEST_EMAIL"] ?? "test@example.com"
                     },
                     payment_method_id = MapMetodoToPagamentoMP(metodo),
-                    token = _configuration["MercadoPago:TestCardToken"] ?? "",
+                    token = _configuration["MERCADOPAGO_TEST_CARD_TOKEN"] ?? "",
                     installments = 1,
                     external_reference = osId.ToString(),
                     metadata = new

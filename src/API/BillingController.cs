@@ -68,6 +68,12 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
             {
                 try
                 {
+                    // Mercado Pago pode enviar o ID em data.id
+                    if (string.IsNullOrWhiteSpace(id))
+                    {
+                        id = HttpContext.Request.Query["data.id"].ToString();
+                    }
+
                     var webhookHandler = HttpContext.RequestServices
                         .GetService<OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoWebhookHandler>();
                     await webhookHandler.HandleWebhookAsync(type, id, signature);

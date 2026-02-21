@@ -7,6 +7,7 @@ using OFICINACARDOZO.BILLINGSERVICE.Contracts.Events;
 using OFICINACARDOZO.BILLINGSERVICE.Domain;
 using OFICINACARDOZO.BILLINGSERVICE.Messaging;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 
 namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
 {
@@ -14,15 +15,18 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
     {
         private readonly BillingDbContext _db;
         private readonly OrcamentoService _orcamentoService;
+        private readonly PagamentoService _pagamentoService;
         private readonly ILogger<OsCreatedHandler> _logger;
 
         public OsCreatedHandler(
             BillingDbContext db, 
-            OrcamentoService orcamentoService, 
+            OrcamentoService orcamentoService,
+            PagamentoService pagamentoService,
             ILogger<OsCreatedHandler> logger)
         {
             _db = db;
             _orcamentoService = orcamentoService;
+            _pagamentoService = pagamentoService;
             _logger = logger;
         }
 
@@ -35,70 +39,62 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                     envelope.Payload.OsId,
                     envelope.CorrelationId);
 
-                // ✅ Idempotencia: se ja existe orcamento para a OS, nao recriar
-                var existing = await _orcamentoService.GetBudgetByOsIdAsync(envelope.Payload.OsId);
-                if (existing != null)
+                var orcamento = await _orcamentoService.GetBudgetByOsIdAsync(envelope.Payload.OsId);
+                if (orcamento == null)
+                {
+                    // ✅ TRANSACTIONAL OUTBOX PATTERN - FASE 1
+                    // Criar Orçamento + OutboxMessage em UMA transação
+                    decimal budgetAmount = 100.00m;
+                    orcamento = await _orcamentoService.GerarEEnviarOrcamentoAsync(
+                        envelope.Payload.OsId,
+                        budgetAmount,
+                        "client@example.com",
+                        envelope.CorrelationId,
+                        envelope.CausationId
+                    );
+
+                    _logger.LogInformation(
+                        "Orçamento criado com ID {OrcamentoId} para OS {OsId}",
+                        orcamento.Id,
+                        envelope.Payload.OsId);
+
+                    var budgetGenerated = new BudgetGenerated
+                    {
+                        OsId = envelope.Payload.OsId,
+                        BudgetId = Guid.NewGuid(),
+                        Amount = budgetAmount,
+                        Status = BudgetStatus.Generated
+                    };
+
+                    var outboxMessage = new OutboxMessage
+                    {
+                        AggregateId = orcamento.OsId,
+                        AggregateType = "OrderService",
+                        EventType = nameof(BudgetGenerated),
+                        Payload = JsonSerializer.Serialize(budgetGenerated),
+                        CreatedAt = DateTime.UtcNow,
+                        Published = false,
+                        CorrelationId = envelope.CorrelationId,
+                        CausationId = Guid.NewGuid()
+                    };
+
+                    _db.Set<OutboxMessage>().Add(outboxMessage);
+                    await _db.SaveChangesAsync();
+
+                    _logger.LogInformation(
+                        "OutboxMessage criada com ID {MessageId} para evento {EventType}",
+                        outboxMessage.Id,
+                        outboxMessage.EventType);
+                }
+                else
                 {
                     _logger.LogInformation(
-                        "Orcamento ja existe para OS {OsId} (Id={OrcamentoId}). Ignorando OsCreated.",
+                        "Orcamento ja existe para OS {OsId} (Id={OrcamentoId}). Reprocessando fluxo.",
                         envelope.Payload.OsId,
-                        existing.Id);
-                    return;
+                        orcamento.Id);
                 }
 
-                // ✅ TRANSACTIONAL OUTBOX PATTERN - FASE 1
-                // Criar Orçamento + OutboxMessage em UMA transação
-                
-                // 1. Criar orçamento local (valor padrão)
-                decimal budgetAmount = 100.00m;
-                var orcamento = await _orcamentoService.GerarEEnviarOrcamentoAsync(
-                    envelope.Payload.OsId,
-                    budgetAmount,
-                    "client@example.com",
-                    envelope.CorrelationId,
-                    envelope.CausationId
-                );
-
-                _logger.LogInformation(
-                    "Orçamento criado com ID {OrcamentoId} para OS {OsId}",
-                    orcamento.Id,
-                    envelope.Payload.OsId);
-
-                // 2. Criar evento de saída (BudgetGenerated)
-                var budgetGenerated = new BudgetGenerated
-                {
-                    OsId = envelope.Payload.OsId,
-                    BudgetId = Guid.NewGuid(),
-                    Amount = budgetAmount,
-                    Status = BudgetStatus.Generated
-                };
-
-                // 3. Criar OutboxMessage (NÃO PUBLICAMOS AGORA)
-                var outboxMessage = new OutboxMessage
-                {
-                    AggregateId = orcamento.OsId,
-                    AggregateType = "OrderService",
-                    EventType = nameof(BudgetGenerated),
-                    Payload = JsonSerializer.Serialize(budgetGenerated),
-                    CreatedAt = DateTime.UtcNow,
-                    Published = false,  // ✅ CRÍTICO: Não publicado ainda
-                    CorrelationId = envelope.CorrelationId,
-                    CausationId = Guid.NewGuid()  // Novo ID para BudgetGenerated
-                };
-
-                _db.Set<OutboxMessage>().Add(outboxMessage);
-
-                // 4. Salvar tudo em transação ÚNICA
-                await _db.SaveChangesAsync();
-
-                _logger.LogInformation(
-                    "OutboxMessage criada com ID {MessageId} para evento {EventType}",
-                    outboxMessage.Id,
-                    outboxMessage.EventType);
-
-                // ✅ PARAR AQUI!
-                // OutboxProcessor (background job) vai publicar isso mais tarde
-                // Isso garante resiliência: se publicação falhar, teremos retries automáticos
+                await ProcessAutoFlowAsync(orcamento, envelope);
             }
             catch (Exception ex)
             {
@@ -106,8 +102,13 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                 if (IsDuplicateKey(ex))
                 {
                     _logger.LogInformation(
-                        "Orçamento para OS {OsId} já existe. Ignorando reprocessamento (idempotente).",
+                        "Orçamento para OS {OsId} já existe. Reprocessando fluxo automático.",
                         envelope.Payload.OsId);
+                    var existing = await _orcamentoService.GetBudgetByOsIdAsync(envelope.Payload.OsId);
+                    if (existing != null)
+                    {
+                        await ProcessAutoFlowAsync(existing, envelope);
+                    }
                     return;  // ✅ Não relança - tratar como sucesso
                 }
                 
@@ -129,6 +130,38 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
             var message = ex.InnerException?.Message ?? ex.Message;
             return message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase) ||
                    message.Contains("orcamento_os_id_key", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task ProcessAutoFlowAsync(Orcamento orcamento, EventEnvelope<OsCreated> envelope)
+        {
+            if (orcamento.Status == StatusOrcamento.Enviado)
+            {
+                orcamento = await _orcamentoService.AprovaBudgetAsync(
+                    orcamento.OsId,
+                    envelope.CorrelationId,
+                    Guid.NewGuid());
+
+                _logger.LogInformation(
+                    "Orcamento aprovado automaticamente para OS {OsId} (Id={OrcamentoId}).",
+                    orcamento.OsId,
+                    orcamento.Id);
+            }
+
+            if (orcamento.Status != StatusOrcamento.Aprovado)
+            {
+                _logger.LogInformation(
+                    "Pagamento nao iniciado: orcamento OS {OsId} com status {Status}.",
+                    orcamento.OsId,
+                    orcamento.Status);
+                return;
+            }
+
+            await _pagamentoService.IniciarPagamentoAsync(
+                orcamento.OsId,
+                orcamento.Id,
+                orcamento.Valor,
+                envelope.CorrelationId,
+                Guid.NewGuid());
         }
     }
 }

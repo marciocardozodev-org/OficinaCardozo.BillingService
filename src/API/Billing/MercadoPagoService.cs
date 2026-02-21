@@ -73,6 +73,15 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API.Billing
                 };
 
                 var jsonContent = JsonSerializer.Serialize(paymentRequest);
+                
+                // Log para debug
+                var tokenValue = _configuration["MERCADOPAGO_TEST_CARD_TOKEN"];
+                _logger.LogInformation(
+                    "Token configurado: {TokenLength} caracteres (vazio={isEmpty}), Email: {Email}",
+                    tokenValue?.Length ?? 0,
+                    string.IsNullOrEmpty(tokenValue),
+                    _configuration["MERCADOPAGO_TEST_EMAIL"]);
+
                 var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
                 _httpClient.DefaultRequestHeaders.Clear();

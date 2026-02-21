@@ -62,8 +62,8 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
             [HttpPost("mercadopago/webhook")]
             [AllowAnonymous]
             public async Task<IActionResult> MercadoPagoWebhook(
-                [FromQuery] string type,
-                [FromQuery] string id,
+                [FromQuery] string? type = null,
+                [FromQuery] string? id = null,
                 [FromHeader(Name = "x-signature")] string? signature = null,
                 [FromBody] MercadoPagoWebhookPayload? payload = null)
             {

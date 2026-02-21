@@ -177,6 +177,21 @@ jobs:
       run: |
         kubectl create secret generic billingservice-secrets --from-literal=jwt-key="$JWT_KEY" -n default --dry-run=client -o yaml | kubectl apply -f -
 
+    - name: Garantir secret billingservice-mercadopago
+      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'
+      env:
+        MERCADOPAGO_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_ACCESS_TOKEN }}
+        MERCADOPAGO_IS_SANDBOX: ${{ secrets.MERCADOPAGO_IS_SANDBOX }}
+        MERCADOPAGO_TEST_EMAIL: ${{ secrets.MERCADOPAGO_TEST_EMAIL }}
+        MERCADOPAGO_TEST_CARD_TOKEN: ${{ secrets.MERCADOPAGO_TEST_CARD_TOKEN }}
+      run: |
+        kubectl create secret generic billingservice-mercadopago \
+          --from-literal=MERCADOPAGO_ACCESS_TOKEN="$MERCADOPAGO_ACCESS_TOKEN" \
+          --from-literal=MERCADOPAGO_IS_SANDBOX="$MERCADOPAGO_IS_SANDBOX" \
+          --from-literal=MERCADOPAGO_TEST_EMAIL="$MERCADOPAGO_TEST_EMAIL" \
+          --from-literal=MERCADOPAGO_TEST_CARD_TOKEN="$MERCADOPAGO_TEST_CARD_TOKEN" \
+          -n default --dry-run=client -o yaml | kubectl apply -f -
+
     - name: Aplicar ConfigMap aws-messaging-config
       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/homolog'
       run: kubectl apply -f deploy/k8s/aws-messaging-config.yaml

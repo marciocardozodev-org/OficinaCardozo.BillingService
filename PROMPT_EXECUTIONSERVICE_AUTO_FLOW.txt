@@ -1,0 +1,209 @@
+================================================================================
+PROMPT: Implementar Fluxo Automático no ExecutionService
+================================================================================
+
+Você é um especialista em .NET 8.0, ASP.NET Core, Entity Framework Core e padrões 
+de microserviços. Sua tarefa é refatorar o handler do ExecutionService para 
+automatizar transitões de estado, seguindo o mesmo padrão do BillingService.
+
+================================================================================
+CONTEXTO
+================================================================================
+
+O ExecutionService já tem:
+✅ ExecutionJob (modelo, tabela, enum StatusExecucao)
+✅ OutboxMessage e OutboxProcessor
+✅ SqsEventConsumerHostedService e SqsEventConsumerImpl
+✅ Endpoints REST para criar/atualizar jobs manualmente
+
+O QUE FALTA:
+❌ Automatizar transições Queued → Diagnosing → Repairing → Finished
+❌ Publicar executivamente ExecutionStarted quando inicia diagnóstico
+❌ Publicar ExecutionFinished quando conclui
+
+OBJETIVO:
+Ao receber PaymentConfirmed, o handler deve:
+1. Criar automaticamente um ExecutionJob (ou reutilizar se já existe)
+2. Fazer todas as transições de estado automaticamente
+3. Publicar eventos via Outbox Pattern em cada transição
+4. Implementar idempotência para reprocessamento seguro
+
+================================================================================
+STATUS DO JOB (ExecutionJob) - JÁ IMPLEMENTADO
+================================================================================
+
+Estados (enum StatusExecucao):
+├─ Queued (0): Nova job, aguardando início
+├─ Diagnosing (1): Diagnosticando problema
+├─ Repairing (2): Executando reparo
+└─ Finished (3): Job concluída
+
+Eventos já existentes:
+├─ ExecutionStarted: Publicado quando transiciona para Diagnosing
+└─ ExecutionFinished: Publicado quando transiciona para Finished
+
+Modelos de dados já existentes:
+├─ ExecutionJob domain model
+├─ OutboxMessage para publicação de eventos
+└─ ExecutionDbContext com todas as configurações
+
+================================================================================
+ESTRUTURA DE ARQUIVOS (JÁ EXISTENTE)
+================================================================================
+
+src/
+├─ Domain/
+│  └─ ExecutionJob.cs (✅ JÁ EXISTE)
+├─ Contracts/Events/
+│  ├─ PaymentConfirmed.cs (✅ JÁ EXISTE)
+│  ├─ ExecutionStarted.cs (✅ JÁ EXISTE)
+│  └─ ExecutionFinished.cs (✅ JÁ EXISTE)
+├─ Handlers/
+│  ├─ PaymentConfirmedHandler.cs (⚠️ REFATORAR - NÃO HÁ AUTOMAÇÃO)
+│  └─ SqsEventConsumerHostedService.cs (✅ JÁ EXISTE - SEM MUDANÇAS)
+├─ Application/
+│  └─ ExecutionJobService.cs (✅ JÁ EXISTE)
+└─ Messaging/
+   ├─ SqsEventConsumerImpl.cs (✅ JÁ EXISTE - APENAS VERIFICAR ROUTING)
+   └─ OutboxProcessor.cs (✅ JÁ EXISTE - SEM MUDANÇAS)
+
+================================================================================
+IMPLEMENTAÇÃO - REFATORAÇÃO DE PaymentConfirmedHandler.cs
+================================================================================
+
+⚠️ OBJETIVO: Transformar handler MANUAL em handler AUTOMÁTICO
+
+MUDANÇAS NECESSÁRIAS:
+
+1. Adicionar método ProcessAutoFlowAsync(ExecutionJob job, EventEnvelope<PaymentConfirmed> envelope)
+   └─ Executar transições Queued → Diagnosing → Repairing → Finished
+
+2. Chamar ProcessAutoFlowAsync após criar/obter job
+   ├─ if (job == null) criar job
+   ├─ Chamar ProcessAutoFlowAsync(job, envelope)
+   └─ Tratar duplicate key chamando ProcessAutoFlowAsync mesmo na exceção
+
+3. Implementar transições com:
+   ├─ Validação do status atual
+   ├─ Atualização do job (usar ExecutionJobService.AtualizarStatusAsync)
+   ├─ Criação de OutboxMessage para eventos
+   ├─ SaveChangesAsync() após cada transição (ou apenas no final)
+   └─ Logging em cada etapa
+
+ESTRUTURA DO ProcessAutoFlowAsync:
+
+   if (job.Status == StatusExecucao.Queued)
+   {
+       // → Transition para Diagnosing
+       // → Criar e salvar OutboxMessage (ExecutionStarted)
+   }
+   
+   if (job.Status == StatusExecucao.Diagnosing)
+   {
+       // → Executar diagnóstico (mock: string com timestamp)
+       // → Transition para Repairing
+       // → Salvar OutboxMessage se necessário
+   }
+   
+   if (job.Status == StatusExecucao.Repairing)
+   {
+       // → Executar reparo (mock: string com timestamp)
+       // → Transition para Finished
+       // → Criar e salvar OutboxMessage (ExecutionFinished)
+   }
+
+EXEMPLO DE TRANSIÇÃO:
+
+   if (job.Status == StatusExecucao.Queued)
+   {
+       job = await _jobService.AtualizarStatusAsync(
+           job.OsId,
+           StatusExecucao.Diagnosing);
+       
+       _logger.LogInformation(
+           "Job transicionado para Diagnosing para OS {OsId} (Id={JobId}).",
+           job.OsId,
+           job.Id);
+       
+       // Criar ExecutionStarted event
+       var executionStarted = new ExecutionStarted
+       {
+           OsId = job.OsId,
+           ExecutionJobId = LongToGuid(job.Id),
+           Status = ExecutionStatus.Diagnosing,
+           CreatedAt = DateTime.UtcNow,
+           CorrelationId = envelope.CorrelationId,
+           CausationId = Guid.NewGuid()
+       };
+       
+       // Salvar OutboxMessage
+       var outboxMessage = new OutboxMessage
+       {
+           AggregateId = job.OsId,
+           AggregateType = "ExecutionService",
+           EventType = nameof(ExecutionStarted),
+           Payload = JsonSerializer.Serialize(executionStarted),
+           CreatedAt = DateTime.UtcNow,
+           Published = false,
+           CorrelationId = envelope.CorrelationId,
+           CausationId = Guid.NewGuid()
+       };
+       
+       _db.Set<OutboxMessage>().Add(outboxMessage);
+       await _db.SaveChangesAsync();
+   }
+
+================================================================================
+PRÓXIMOS PASSOS
+================================================================================
+
+1. ✅ Refatorar PaymentConfirmedHandler.cs (ÚNICO ARQUIVO A MODIFICAR)
+   ├─ Adicionar ProcessAutoFlowAsync com transições automáticas
+   ├─ Implementar idempotência (duplicate key handling)
+   └─ Publicar eventos via Outbox Pattern
+
+2. Registrar handler no SqsEventConsumerImpl.cs (se não estiver registrado)
+   ├─ Verificar se PaymentConfirmed é roteado corretamente
+   └─ Usar ConsumeAsync para delegar ao handler
+
+3. Validar integração em Program.cs
+   ├─ Verificar PaymentConfirmedHandler registrado como scoped
+   └─ Verificar ExecutionJobService registrado
+
+4. Validação E2E (nesta ordem)
+   ├─ Publicar PaymentConfirmed no SNS
+   ├─ Verificar logs (Queued → Diagnosing → Repairing → Finished)
+   ├─ Verificar outbox (ExecutionStarted + ExecutionFinished publicados)
+   └─ Verificar status do job no banco (tabela execution_job)
+
+================================================================================
+NOTAS IMPORTANTES
+================================================================================
+
+✅ Refatoração (NÃO IMPLEMENTAÇÃO DO ZERO)
+   - Apenas refatorar PaymentConfirmedHandler.cs
+   - Usar classes/interfaces que já existem
+   - Não criar novos arquivos ou tabelas
+
+✅ Padrão: Idêntico ao OsCreatedHandler (BillingService)
+   - Mesmo fluxo: Criar/obter recurso → Processar transições automáticas
+   - Mesmo tratamento de idempotência
+   - Mesmo uso do Transactional Outbox Pattern
+
+✅ Transições Automáticas Completas
+   - Queued → Diagnosing (publica ExecutionStarted)
+   - Diagnosing → Repairing (executa diagnóstico)
+   - Repairing → Finished (publica ExecutionFinished)
+   - Tudo em uma única invocação do handler
+
+✅ Logging Estruturado
+   - Rastreamento de CorrelationId em cada etapa
+   - Logs diferenciados para cada transição
+   - Facilita debugging de fluxo E2E
+
+⚠️ Mudanças Mínimas Necessárias:
+   - Apenas refatorar o handler
+   - Adicionar imports necessários
+   - Usar métodos existentes de ExecutionJobService
+
+================================================================================

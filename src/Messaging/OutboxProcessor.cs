@@ -75,12 +75,14 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
 
                 // 1. Query mensagens não publicadas (ordenado por mais antigas primeiro)
                 var unpublishedMessages = await dbContext.Set<OutboxMessage>()
+                    .AsNoTracking()  // ✅ Disable change tracking for read-only query
                     .Where(m => !m.Published)
                     .OrderBy(m => m.CreatedAt)
                     .ToListAsync(stoppingToken);
 
                 if (unpublishedMessages.Count == 0)
                 {
+                    _logger.LogDebug("📭 Nenhuma mensagem Outbox pendente no momento");
                     return; // Nada para fazer
                 }
 
@@ -91,7 +93,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
                 {
                     try
                     {
-                        await PublishOutboxMessageAsync(message, snsClient, snsTopics, stoppingToken);
+                        var snsMessageId = await PublishOutboxMessageAsync(message, snsClient, snsTopics, stoppingToken);
 
                         // 3. Marcar como publicado sem regravar DateTime Unspecified
                         var publishedAtUtc = DateTime.UtcNow;
@@ -102,10 +104,11 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
                                 .SetProperty(m => m.PublishedAt, publishedAtUtc), stoppingToken);
 
                         _logger.LogInformation(
-                            "✅ OutboxMessage {MessageId} ({EventType}) publicada com sucesso. CorrelationId: {CorrelationId}",
+                            "✅ OutboxMessage {MessageId} ({EventType}) publicada com sucesso. CorrelationId: {CorrelationId}. SnsMessageId: {SnsMessageId}",
                             message.Id,
                             message.EventType,
-                            message.CorrelationId);
+                            message.CorrelationId,
+                            snsMessageId);
                     }
                     catch (Exception ex)
                     {
@@ -120,7 +123,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
             }
         }
 
-        private async Task PublishOutboxMessageAsync(
+        private async Task<string> PublishOutboxMessageAsync(
             OutboxMessage message,
             IAmazonSimpleNotificationService snsClient,
             SnsTopicConfiguration snsTopics,
@@ -168,6 +171,14 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
                             DataType = "String",
                             StringValue = message.CausationId.ToString()
                         }
+                    },
+                    {
+                        "Timestamp",
+                        new MessageAttributeValue
+                        {
+                            DataType = "String",
+                            StringValue = DateTime.UtcNow.ToString("o")
+                        }
                     }
                 }
             };
@@ -178,6 +189,8 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
                 "📨 Evento publicado em SNS. MessageId: {SnsMessageId}, TopicArn: {TopicArn}",
                 response.MessageId,
                 topicArn);
+
+            return response.MessageId ?? string.Empty;
         }
     }
 

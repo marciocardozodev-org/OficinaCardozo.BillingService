@@ -44,7 +44,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 OsId = osId,
                 OrcamentoId = orcamentoId,
                 Valor = valor,
-                Metodo = "CREDITO_MOCK",
+                Metodo = "CREDIT_CARD",
                 Status = StatusPagamento.Pendente,
                 CorrelationId = correlationId,
                 CausationId = causationId,
@@ -58,12 +58,12 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 "Pagamento registrado com ID {PaymentId} em estado Pendente",
                 pagamento.Id);
 
-            // 2. Chamar serviço de pagamento (Mercado Pago mock)
+            // 2. Chamar serviço de pagamento (Mercado Pago real ou mock)
             var providerPaymentId = await _mercadoPago.InitiatePaymentAsync(
                 osId,
                 orcamentoId,
                 valor,
-                "CREDITO_MOCK",
+                "CREDIT_CARD",
                 $"Pagamento para OS {osId}");
 
             // 3. Atualizar o registro com resultado e publicar evento apropriado

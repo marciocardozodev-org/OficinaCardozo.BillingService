@@ -64,25 +64,55 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
             public async Task<IActionResult> MercadoPagoWebhook(
                 [FromQuery] string type,
                 [FromQuery] string id,
-                [FromHeader(Name = "x-signature")] string? signature = null)
+                [FromHeader(Name = "x-signature")] string? signature = null,
+                [FromBody] MercadoPagoWebhookPayload? payload = null)
             {
                 try
                 {
-                    // Mercado Pago pode enviar o ID em data.id
-                    if (string.IsNullOrWhiteSpace(id))
+                    // Suporta ambos os formatos:
+                    // 1. Query params: ?type=payment&id=123 (testes manuais)
+                    // 2. Body JSON: {"action": "payment.created", "data": {"id": 123}} (MP real)
+                    
+                    var webhookType = type;
+                    var webhookId = id;
+                    
+                    // Se body foi enviado, extrair informações dele
+                    if (payload != null && !string.IsNullOrWhiteSpace(payload.Action))
                     {
-                        id = HttpContext.Request.Query["data.id"].ToString();
+                        // Mapear action do MP para nosso formato (payment.created -> payment)
+                        webhookType = payload.Action.StartsWith("payment", StringComparison.OrdinalIgnoreCase)
+                            ? "payment"
+                            : payload.Action;
+                        
+                        if (payload.Data?.Id != null)
+                        {
+                            webhookId = payload.Data.Id.ToString();
+                        }
+                    }
+                    
+                    // Fallback: tentar extrair ID de data.id query param
+                    if (string.IsNullOrWhiteSpace(webhookId))
+                    {
+                        webhookId = HttpContext.Request.Query["data.id"].ToString();
                     }
 
                     var webhookHandler = HttpContext.RequestServices
                         .GetService<OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoWebhookHandler>();
-                    await webhookHandler.HandleWebhookAsync(type, id, signature);
+                    
+                    await webhookHandler.HandleWebhookAsync(webhookType, webhookId, signature);
                     return Ok(new { message = "Webhook processado com sucesso" });
                 }
                 catch (Exception ex)
                 {
                     return StatusCode(500, new { erro = "Erro ao processar webhook", detalhe = ex.Message });
                 }
+            }
+
+            [HttpGet("mercadopago/webhook")]
+            [AllowAnonymous]
+            public IActionResult MercadoPagoWebhookHealth()
+            {
+                return Ok(new { message = "Webhook endpoint ativo" });
             }
 
         [HttpPut("status-os")]
@@ -178,6 +208,25 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
             {
                 return StatusCode(500, new { erro = "Erro ao iniciar pagamento", detalhe = ex.Message });
             }
+        }
+
+        /// <summary>
+        /// DTO para payload do webhook do Mercado Pago
+        /// Formato: {"action": "payment.created", "data": {"id": 123}}
+        /// </summary>
+        public class MercadoPagoWebhookPayload
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("action")]
+            public string? Action { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("data")]
+            public WebhookData? Data { get; set; }
+        }
+
+        public class WebhookData
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("id")]
+            public long? Id { get; set; }
         }
     }
 

@@ -9,6 +9,8 @@ data:
   AWS_SQS_QUEUE_DLQ_BILLING: https://sqs.sa-east-1.amazonaws.com/953082827427/billing-events-dlq
   AWS_SNS_TOPIC_BUDGETGENERATED: arn:aws:sns:sa-east-1:953082827427:budget-generated
   AWS_SNS_TOPIC_BUDGETAPPROVED: arn:aws:sns:sa-east-1:953082827427:budget-approved
+  AWS_SNS_TOPIC_BUDGETREJECTED: arn:aws:sns:sa-east-1:953082827427:budget-rejected
+  AWS_SNS_TOPIC_PAYMENTPENDING: arn:aws:sns:sa-east-1:953082827427:payment-pending
   AWS_SNS_TOPIC_PAYMENTCONFIRMED: arn:aws:sns:sa-east-1:953082827427:payment-confirmed
   AWS_SNS_TOPIC_PAYMENTFAILED: arn:aws:sns:sa-east-1:953082827427:payment-failed
   AWS_SNS_TOPIC_PAYMENTREVERSED: arn:aws:sns:sa-east-1:953082827427:payment-reversed

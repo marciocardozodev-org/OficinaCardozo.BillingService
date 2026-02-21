@@ -77,6 +77,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API.Billing
 
                 _httpClient.DefaultRequestHeaders.Clear();
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+                _httpClient.DefaultRequestHeaders.Add("X-Idempotency-Key", Guid.NewGuid().ToString());
 
                 var response = await _httpClient.PostAsync($"{baseUrl}/v1/payments", httpContent);
                 var responseContent = await response.Content.ReadAsStringAsync();

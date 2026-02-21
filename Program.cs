@@ -124,6 +124,7 @@ var snsTopics = new SnsTopicConfiguration
     BudgetGeneratedTopicArn = Environment.GetEnvironmentVariable("AWS_SNS_TOPIC_BUDGETGENERATED") ?? "arn:aws:sns:sa-east-1:000000000000:budget-generated",
     BudgetApprovedTopicArn = Environment.GetEnvironmentVariable("AWS_SNS_TOPIC_BUDGETAPPROVED") ?? "arn:aws:sns:sa-east-1:000000000000:budget-approved",
     BudgetRejectedTopicArn = Environment.GetEnvironmentVariable("AWS_SNS_TOPIC_BUDGETREJECTED") ?? "arn:aws:sns:sa-east-1:000000000000:budget-rejected",
+    PaymentPendingTopicArn = Environment.GetEnvironmentVariable("AWS_SNS_TOPIC_PAYMENTPENDING") ?? "arn:aws:sns:sa-east-1:000000000000:payment-pending",
     PaymentConfirmedTopicArn = Environment.GetEnvironmentVariable("AWS_SNS_TOPIC_PAYMENTCONFIRMED") ?? "arn:aws:sns:sa-east-1:000000000000:payment-confirmed",
     PaymentFailedTopicArn = Environment.GetEnvironmentVariable("AWS_SNS_TOPIC_PAYMENTFAILED") ?? "arn:aws:sns:sa-east-1:000000000000:payment-failed",
     PaymentReversedTopicArn = Environment.GetEnvironmentVariable("AWS_SNS_TOPIC_PAYMENTREVERSED") ?? "arn:aws:sns:sa-east-1:000000000000:payment-reversed"

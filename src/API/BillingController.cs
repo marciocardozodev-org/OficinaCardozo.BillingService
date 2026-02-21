@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using OFICINACARDOZO.BILLINGSERVICE.Application;
 using OFICINACARDOZO.BILLINGSERVICE.Domain;
 
@@ -207,6 +208,44 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
             catch (Exception ex)
             {
                 return StatusCode(500, new { erro = "Erro ao iniciar pagamento", detalhe = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// GET /api/billing/outbox - Lista todos os eventos no outbox
+        /// </summary>
+        [AllowAnonymous]
+        [HttpGet("outbox")]
+        public async Task<IActionResult> GetOutbox(
+            [FromServices] BillingDbContext db)
+        {
+            try
+            {
+                var events = await db.OutboxMessages
+                    .OrderByDescending(o => o.CreatedAt)
+                    .Take(50)
+                    .Select(o => new
+                    {
+                        o.Id,
+                        o.EventType,
+                        o.Published,
+                        o.CreatedAt,
+                        o.PublishedAt,
+                        o.CorrelationId,
+                        PayloadPreview = o.Payload.Length > 200 ? 
+                            o.Payload.Substring(0, 200) + "..." : o.Payload
+                    })
+                    .ToListAsync();
+
+                return Ok(new
+                {
+                    Total = events.Count,
+                    Events = events
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { erro = ex.Message });
             }
         }
 

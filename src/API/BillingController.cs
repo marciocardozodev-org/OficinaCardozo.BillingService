@@ -58,6 +58,26 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
             if (pagamento == null) return NotFound();
             return Ok(pagamento);
         }
+        
+            [HttpPost("mercadopago/webhook")]
+            [AllowAnonymous]
+            public async Task<IActionResult> MercadoPagoWebhook(
+                [FromQuery] string type,
+                [FromQuery] string id,
+                [FromHeader(Name = "x-signature")] string? signature = null)
+            {
+                try
+                {
+                    var webhookHandler = HttpContext.RequestServices
+                        .GetService<OFICINACARDOZO.BILLINGSERVICE.API.Billing.MercadoPagoWebhookHandler>();
+                    await webhookHandler.HandleWebhookAsync(type, id, signature);
+                    return Ok(new { message = "Webhook processado com sucesso" });
+                }
+                catch (Exception ex)
+                {
+                    return StatusCode(500, new { erro = "Erro ao processar webhook", detalhe = ex.Message });
+                }
+            }
 
         [HttpPut("status-os")]
         public IActionResult AtualizarStatusOs([FromBody] AtualizacaoStatusOsDto dto)

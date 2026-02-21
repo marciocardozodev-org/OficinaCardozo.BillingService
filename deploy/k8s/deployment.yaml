@@ -99,6 +99,27 @@ spec:
             configMapKeyRef:
               name: aws-messaging-config
               key: AWS_SNS_TOPIC_PAYMENTREVERSED
+        # Mercado Pago Configuration
+        - name: MERCADOPAGO_ACCESS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: billingservice-mercadopago
+              key: MERCADOPAGO_ACCESS_TOKEN
+        - name: MERCADOPAGO_IS_SANDBOX
+          valueFrom:
+            secretKeyRef:
+              name: billingservice-mercadopago
+              key: MERCADOPAGO_IS_SANDBOX
+        - name: MERCADOPAGO_TEST_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: billingservice-mercadopago
+              key: MERCADOPAGO_TEST_EMAIL
+        - name: MERCADOPAGO_TEST_CARD_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: billingservice-mercadopago
+              key: MERCADOPAGO_TEST_CARD_TOKEN
         volumeMounts:
         - name: cert-global-bundle-pe
           mountPath: /etc/ssl/certs/global-bundle.pem

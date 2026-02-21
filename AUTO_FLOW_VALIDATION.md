@@ -8,6 +8,26 @@ Este roteiro valida o fluxo automatico OsCreated -> BudgetApproved -> PaymentCon
 - OutboxProcessor rodando.
 - Permissoes AWS configuradas para SNS/SQS.
 
+## Checklist de rollout (quando a tag chegar)
+
+1) Atualizar a imagem no deployment
+
+kubectl set image deployment/billingservice billingservice=marciocardozodev/oficinacardozo-billingservice:<TAG>
+
+2) Aguardar rollout
+
+kubectl rollout status deployment/billingservice
+
+3) Validar pods
+
+kubectl get pods -l app=billingservice
+
+## Validacao rapida (apos rollout)
+
+1) Verificar servicos background
+
+kubectl logs -l app=billingservice --tail=200 | grep -E "SqsEventConsumer|OutboxProcessor"
+
 ## Passo 1 - Publicar OsCreated
 
 Exemplo de payload (SNS -> SQS):
@@ -52,6 +72,10 @@ Procure por:
 - "Processando OsCreated"
 - "Orcamento aprovado automaticamente"
 - "Pagamento confirmado"
+
+## Passo 5 - Verificar fila DLQ (se houver falhas)
+
+Se houver erros de consumo, verifique a DLQ do billing-events.
 
 ## Observacao
 

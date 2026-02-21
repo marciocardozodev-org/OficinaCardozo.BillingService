@@ -38,13 +38,15 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 "Iniciando pagamento para OS {OsId}, Orçamento {OrcamentoId}, Valor: {Valor}",
                 osId, orcamentoId, valor);
 
+            var paymentMethod = "PIX";
+
             // 1. Criar registro de pagamento em estado PENDENTE
             var pagamento = new Pagamento
             {
                 OsId = osId,
                 OrcamentoId = orcamentoId,
                 Valor = valor,
-                Metodo = "CREDIT_CARD",
+                Metodo = paymentMethod,
                 Status = StatusPagamento.Pendente,
                 CorrelationId = correlationId,
                 CausationId = causationId,
@@ -63,8 +65,8 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Application
                 osId,
                 orcamentoId,
                 valor,
-                "CREDIT_CARD",
-                $"Pagamento para OS {osId}");
+                paymentMethod,
+                $"Pagamento PIX para OS {osId}");
 
             // 3. Atualizar o registro com resultado e publicar evento apropriado
             if (!string.IsNullOrEmpty(providerPaymentId))

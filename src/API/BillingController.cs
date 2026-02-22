@@ -38,20 +38,6 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
             return Ok(orcamento);
         }
 
-        [HttpPost("pagamento")]
-        public IActionResult RegistrarPagamento([FromBody] PagamentoRequestDto dto)
-        {
-            var pagamento = _pagamentoService.RegistrarPagamento(
-                dto.OsId, 
-                dto.OrcamentoId,
-                dto.Valor, 
-                dto.Metodo,
-                dto.CorrelationId,
-                dto.CausationId ?? Guid.NewGuid()
-            );
-            return Ok(pagamento);
-        }
-
         [HttpGet("pagamento/{id}")]
         public IActionResult ObterPagamento(long id)
         {

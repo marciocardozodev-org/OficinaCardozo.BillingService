@@ -44,7 +44,34 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                 {
                     // ✅ TRANSACTIONAL OUTBOX PATTERN - FASE 1
                     // Criar Orçamento + OutboxMessage em UMA transação
-                    decimal budgetAmount = 100.00m;
+                    
+                    // ✅ Extração do valor do evento com fallback
+                    const decimal DefaultBudgetAmount = 100.00m;
+                    decimal budgetAmount;
+                    bool usedFallback = false;
+                    
+                    if (envelope.Payload.Valor.HasValue && envelope.Payload.Valor.Value > 0)
+                    {
+                        budgetAmount = envelope.Payload.Valor.Value;
+                        _logger.LogInformation(
+                            "[CorrelationId: {CorrelationId}] Usando valor do evento OsCreated: {Valor} para OS {OsId}",
+                            envelope.CorrelationId,
+                            budgetAmount,
+                            envelope.Payload.OsId);
+                    }
+                    else
+                    {
+                        budgetAmount = DefaultBudgetAmount;
+                        usedFallback = true;
+                        _logger.LogWarning(
+                            "[CorrelationId: {CorrelationId}] Valor não fornecido ou inválido no OsCreated (Valor={ValorRecebido}). " +
+                            "Usando fallback: {DefaultValue} para OS {OsId}",
+                            envelope.CorrelationId,
+                            envelope.Payload.Valor,
+                            DefaultBudgetAmount,
+                            envelope.Payload.OsId);
+                    }
+                    
                     orcamento = await _orcamentoService.GerarEEnviarOrcamentoAsync(
                         envelope.Payload.OsId,
                         budgetAmount,
@@ -54,9 +81,13 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                     );
 
                     _logger.LogInformation(
-                        "Orçamento criado com ID {OrcamentoId} para OS {OsId}",
+                        "[CorrelationId: {CorrelationId}] Orçamento criado com ID {OrcamentoId} para OS {OsId}. " +
+                        "Valor={Valor}, UsedFallback={UsedFallback}",
+                        envelope.CorrelationId,
                         orcamento.Id,
-                        envelope.Payload.OsId);
+                        envelope.Payload.OsId,
+                        budgetAmount,
+                        usedFallback);
 
                     var budgetGenerated = new BudgetGenerated
                     {
@@ -156,6 +187,13 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                 return;
             }
 
+            _logger.LogInformation(
+                "[CorrelationId: {CorrelationId}] Iniciando pagamento para OS {OsId}. " +
+                "Valor do orçamento: {ValorOrcamento}",
+                envelope.CorrelationId,
+                orcamento.OsId,
+                orcamento.Valor);
+                
             await _pagamentoService.IniciarPagamentoAsync(
                 orcamento.OsId,
                 orcamento.Id,

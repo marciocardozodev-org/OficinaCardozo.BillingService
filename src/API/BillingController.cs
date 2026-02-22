@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using OFICINACARDOZO.BILLINGSERVICE.Application;
 using OFICINACARDOZO.BILLINGSERVICE.Domain;
 
@@ -14,15 +15,18 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
         private readonly OrcamentoService _orcamentoService;
         private readonly PagamentoService _pagamentoService;
         private readonly AtualizacaoStatusOsService _statusOsService;
+        private readonly ILogger<BillingController> _logger;
 
         public BillingController(
             OrcamentoService orcamentoService, 
             PagamentoService pagamentoService, 
-            AtualizacaoStatusOsService statusOsService)
+            AtualizacaoStatusOsService statusOsService,
+            ILogger<BillingController> logger)
         {
             _orcamentoService = orcamentoService;
             _pagamentoService = pagamentoService;
             _statusOsService = statusOsService;
+            _logger = logger;
         }
 
         [HttpPost("orcamento")]
@@ -62,6 +66,23 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API
                     
                     var webhookType = type;
                     var webhookId = id;
+                    var webhookAction = payload?.Action ?? HttpContext.Request.Query["action"].ToString();
+
+                    if (string.IsNullOrWhiteSpace(webhookAction))
+                    {
+                        _logger.LogWarning(
+                            "Webhook sem action. Ignorando para evitar confirmacao indevida. CorrelationId: {CorrelationId}",
+                            HttpContext.Request.Headers["x-correlation-id"].ToString());
+                        return Ok(new { message = "Webhook ignorado: action ausente" });
+                    }
+
+                    if (!webhookAction.Equals("payment.updated", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logger.LogInformation(
+                            "Webhook ignorado. Action nao suportada: {Action}",
+                            webhookAction);
+                        return Ok(new { message = "Webhook ignorado: action nao suportada" });
+                    }
                     
                     // Se body foi enviado, extrair informações dele
                     if (payload != null && !string.IsNullOrWhiteSpace(payload.Action))

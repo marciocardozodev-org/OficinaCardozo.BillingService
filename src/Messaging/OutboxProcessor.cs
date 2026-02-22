@@ -104,9 +104,9 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
                                 .SetProperty(m => m.PublishedAt, publishedAtUtc), stoppingToken);
 
                         _logger.LogInformation(
-                            "✅ OutboxMessage {MessageId} ({EventType}) publicada com sucesso. CorrelationId: {CorrelationId}. SnsMessageId: {SnsMessageId}",
-                            message.Id,
+                            "🎉 BillingService gerou evento {EventType}. Id: {MessageId}, CorrelationId: {CorrelationId}, SnsMessageId: {SnsMessageId}, Status: PublicadoComSucesso",
                             message.EventType,
+                            message.Id,
                             message.CorrelationId,
                             snsMessageId);
                     }

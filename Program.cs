@@ -189,19 +189,18 @@ builder.Services.AddDbContext<BillingDbContext>(options =>
 
 var app = builder.Build();
 
-// Log de inicialização
-var configLogger = app.Services.GetRequiredService<Serilog.ILogger>();
-configLogger.Information("🚀 BillingService iniciado. CloudWatch Log Group: {CloudWatchLogGroup}", cloudWatchLogGroup);
+// Log de inicialização usando o logger estático do Serilog
+Log.Information("🚀 BillingService iniciado. CloudWatch Log Group: {CloudWatchLogGroup}", cloudWatchLogGroup);
 
 // Log de configuração do Mercado Pago após build
-configLogger.Information(
+Log.Information(
     "🔐 Mercado Pago Configuration Loaded: IsSandbox={IsSandbox}, HasAccessToken={HasAccessToken}, UseRealService={UseReal}",
     mpIsSandbox,
     !string.IsNullOrEmpty(mpAccessToken),
     !string.IsNullOrEmpty(mpAccessToken) ? "SIM (MercadoPagoService)" : "NÃO (MercadoPagoMockService)"
 );
 
-configLogger.Information("AWS Region: {AwsRegion}, Queue: {QueueUrl}", awsRegion, sqsQueueUrl);
+Log.Information("AWS Region: {AwsRegion}, Queue: {QueueUrl}", awsRegion, sqsQueueUrl);
 
 if (app.Environment.IsDevelopment())
 {

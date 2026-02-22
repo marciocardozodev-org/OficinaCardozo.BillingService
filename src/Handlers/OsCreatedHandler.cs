@@ -35,7 +35,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
             try
             {
                 _logger.LogInformation(
-                    "Processando OsCreated para OS {OsId} com CorrelationId {CorrelationId}",
+                    "🎉 BillingService consumiu evento OsCreated. OsId: {OsId}, CorrelationId: {CorrelationId}",
                     envelope.Payload.OsId,
                     envelope.CorrelationId);
 
@@ -44,7 +44,34 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                 {
                     // ✅ TRANSACTIONAL OUTBOX PATTERN - FASE 1
                     // Criar Orçamento + OutboxMessage em UMA transação
-                    decimal budgetAmount = 100.00m;
+                    
+                    // ✅ Extração do valor do evento com fallback
+                    const decimal DefaultBudgetAmount = 100.00m;
+                    decimal budgetAmount;
+                    bool usedFallback = false;
+                    
+                    if (envelope.Payload.Valor.HasValue && envelope.Payload.Valor.Value > 0)
+                    {
+                        budgetAmount = envelope.Payload.Valor.Value;
+                        _logger.LogInformation(
+                            "[CorrelationId: {CorrelationId}] Usando valor do evento OsCreated: {Valor} para OS {OsId}",
+                            envelope.CorrelationId,
+                            budgetAmount,
+                            envelope.Payload.OsId);
+                    }
+                    else
+                    {
+                        budgetAmount = DefaultBudgetAmount;
+                        usedFallback = true;
+                        _logger.LogWarning(
+                            "[CorrelationId: {CorrelationId}] Valor não fornecido ou inválido no OsCreated (Valor={ValorRecebido}). " +
+                            "Usando fallback: {DefaultValue} para OS {OsId}",
+                            envelope.CorrelationId,
+                            envelope.Payload.Valor,
+                            DefaultBudgetAmount,
+                            envelope.Payload.OsId);
+                    }
+                    
                     orcamento = await _orcamentoService.GerarEEnviarOrcamentoAsync(
                         envelope.Payload.OsId,
                         budgetAmount,
@@ -54,9 +81,13 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                     );
 
                     _logger.LogInformation(
-                        "Orçamento criado com ID {OrcamentoId} para OS {OsId}",
+                        "[CorrelationId: {CorrelationId}] Orçamento criado com ID {OrcamentoId} para OS {OsId}. " +
+                        "Valor={Valor}, UsedFallback={UsedFallback}",
+                        envelope.CorrelationId,
                         orcamento.Id,
-                        envelope.Payload.OsId);
+                        envelope.Payload.OsId,
+                        budgetAmount,
+                        usedFallback);
 
                     var budgetGenerated = new BudgetGenerated
                     {
@@ -82,9 +113,12 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                     await _db.SaveChangesAsync();
 
                     _logger.LogInformation(
-                        "OutboxMessage criada com ID {MessageId} para evento {EventType}",
+                        "✅ BillingService gerou OutboxMessage para evento {EventType}. " +
+                        "MessageId: {MessageId}, OsId: {OsId}, CorrelationId: {CorrelationId}, Status: ProntoParaPublicar",
+                        outboxMessage.EventType,
                         outboxMessage.Id,
-                        outboxMessage.EventType);
+                        envelope.Payload.OsId,
+                        envelope.CorrelationId);
                 }
                 else
                 {
@@ -114,8 +148,10 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                 
                 _logger.LogError(
                     ex,
-                    "Erro ao processar OsCreated para OS {OsId}",
-                    envelope.Payload.OsId);
+                    "❌ Erro ao processar OsCreated. OsId: {OsId}, CorrelationId: {CorrelationId}, Erro: {ErrorMessage}",
+                    envelope.Payload.OsId,
+                    envelope.CorrelationId,
+                    ex.Message);
                 throw;  // ❌ Relança apenas para erros reais
             }
         }
@@ -156,6 +192,13 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                 return;
             }
 
+            _logger.LogInformation(
+                "[CorrelationId: {CorrelationId}] Iniciando pagamento para OS {OsId}. " +
+                "Valor do orçamento: {ValorOrcamento}",
+                envelope.CorrelationId,
+                orcamento.OsId,
+                orcamento.Valor);
+                
             await _pagamentoService.IniciarPagamentoAsync(
                 orcamento.OsId,
                 orcamento.Id,

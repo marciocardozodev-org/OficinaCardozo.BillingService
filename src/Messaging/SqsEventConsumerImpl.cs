@@ -43,7 +43,9 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
                         CreatedAt = TryGetDateTime(payloadElement, "CreatedAt")
                             ?? TryGetDateTime(payloadElement, "createdAt")
                             ?? TryGetDateTime(payloadElement, "timestamp")
-                            ?? DateTime.UtcNow
+                            ?? DateTime.UtcNow,
+                        Valor = TryGetDecimal(payloadElement, "Valor")
+                            ?? TryGetDecimal(payloadElement, "valor")
                     };
 
                     var envelope = new EventEnvelope<OsCreated>
@@ -137,6 +139,37 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
                 valueElement.TryGetInt64(out var unixSeconds))
             {
                 return DateTimeOffset.FromUnixTimeSeconds(unixSeconds).UtcDateTime;
+            }
+
+            return null;
+        }
+
+        private static decimal? TryGetDecimal(JsonElement root, string propertyName)
+        {
+            if (!root.TryGetProperty(propertyName, out var valueElement))
+            {
+                return null;
+            }
+
+            if (valueElement.ValueKind == JsonValueKind.Number)
+            {
+                if (valueElement.TryGetDecimal(out var decimalValue))
+                {
+                    return decimalValue;
+                }
+                if (valueElement.TryGetDouble(out var doubleValue))
+                {
+                    return (decimal)doubleValue;
+                }
+            }
+
+            if (valueElement.ValueKind == JsonValueKind.String)
+            {
+                var stringValue = valueElement.GetString();
+                if (decimal.TryParse(stringValue, out var parsed))
+                {
+                    return parsed;
+                }
             }
 
             return null;

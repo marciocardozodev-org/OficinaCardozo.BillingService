@@ -39,44 +39,55 @@ namespace OFICINACARDOZO.BILLINGSERVICE.API.Billing
         {
             try
             {
-                var accessToken = _configuration["MercadoPago:AccessToken"];
+                var accessToken = _configuration["MERCADOPAGO_ACCESS_TOKEN"];
                 if (string.IsNullOrEmpty(accessToken))
                 {
                     _logger.LogWarning("MercadoPago AccessToken não configurado. Retornando null.");
                     return null;
                 }
 
-                var isSandbox = _configuration.GetValue<bool>("MercadoPago:IsSandbox", true);
+                var isSandbox = _configuration.GetValue<bool>("MERCADOPAGO_IS_SANDBOX", true);
                 var baseUrl = isSandbox ? SandboxBaseUrl : ProductionBaseUrl;
 
                 _logger.LogInformation(
                     "Iniciando pagamento (HTTP) para OS {OsId}, Valor: {Valor}, Ambiente: {Ambiente}",
                     osId, valor, isSandbox ? "SANDBOX" : "PRODUCAO");
 
-                var paymentRequest = new
+                var paymentMethodId = MapMetodoToPagamentoMP(metodo);
+                
+                // Construir payload dinamicamente (PIX não precisa de token)
+                var paymentRequest = new Dictionary<string, object>
                 {
-                    transaction_amount = valor,
-                    description = description ?? $"Pagamento para OS {osId}",
-                    payer = new
-                    {
-                        email = _configuration["MercadoPago:TestEmail"] ?? "test@example.com"
-                    },
-                    payment_method_id = MapMetodoToPagamentoMP(metodo),
-                    token = _configuration["MercadoPago:TestCardToken"] ?? "",
-                    installments = 1,
-                    external_reference = osId.ToString(),
-                    metadata = new
-                    {
-                        osId = osId.ToString(),
-                        orcamentoId = orcamentoId
-                    }
+                    { "transaction_amount", valor },
+                    { "description", description ?? $"Pagamento para OS {osId}" },
+                    { "payment_method_id", paymentMethodId },
+                    { "payer", new { email = _configuration["MERCADOPAGO_TEST_EMAIL"] ?? "test@example.com" } },
+                    { "installments", 1 },
+                    { "external_reference", osId.ToString() },
+                    { "metadata", new { osId = osId.ToString(), orcamentoId = orcamentoId } }
                 };
 
+                // Adicionar token apenas para métodos que não são PIX
+                if (paymentMethodId != "pix")
+                {
+                    paymentRequest["token"] = _configuration["MERCADOPAGO_TEST_CARD_TOKEN"] ?? "";
+                }
+
                 var jsonContent = JsonSerializer.Serialize(paymentRequest);
+                
+                // Log para debug
+                var tokenValue = _configuration["MERCADOPAGO_TEST_CARD_TOKEN"];
+                _logger.LogInformation(
+                    "Token configurado: {TokenLength} caracteres (vazio={isEmpty}), Email: {Email}",
+                    tokenValue?.Length ?? 0,
+                    string.IsNullOrEmpty(tokenValue),
+                    _configuration["MERCADOPAGO_TEST_EMAIL"]);
+
                 var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
                 _httpClient.DefaultRequestHeaders.Clear();
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+                _httpClient.DefaultRequestHeaders.Add("X-Idempotency-Key", Guid.NewGuid().ToString());
 
                 var response = await _httpClient.PostAsync($"{baseUrl}/v1/payments", httpContent);
                 var responseContent = await response.Content.ReadAsStringAsync();

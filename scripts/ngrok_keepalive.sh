@@ -27,7 +27,13 @@ ensure_port_forward() {
 }
 
 get_public_url() {
-  curl -s "$CHECK_URL" | python3 -c "import sys, json; data=json.load(sys.stdin); t=data['tunnels'][0] if data.get('tunnels') else None; print(t['public_url'] if t else '')"
+  local response
+  response="$(curl -s "$CHECK_URL" || true)"
+  if [[ -z "$response" ]]; then
+    echo ""
+    return
+  fi
+  echo "$response" | python3 -c "import sys, json; data=json.load(sys.stdin); t=data['tunnels'][0] if data.get('tunnels') else None; print(t['public_url'] if t else '')"
 }
 
 while true; do

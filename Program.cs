@@ -1,6 +1,7 @@
 using OFICINACARDOZO.BILLINGSERVICE;
 using OFICINACARDOZO.BILLINGSERVICE.Messaging;
 using OFICINACARDOZO.BILLINGSERVICE.Handlers;
+using OFICINACARDOZO.BILLINGSERVICE.API;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -11,11 +12,28 @@ using System.Text;
 using Amazon.SQS;
 using Amazon.SimpleNotificationService;
 using Amazon.Runtime;
+using Serilog;
+using Serilog.Context;
 
 // Configure AppContext for Npgsql DateTime handling
 AppContext.SetSwitch("Npgsql.DisableDateTimeInfinityConversions", true);
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ========== SERILOG CONFIGURATION ==========
+var awsRegion = Environment.GetEnvironmentVariable("AWS_REGION") ?? "sa-east-1";
+var cloudWatchLogGroup = Environment.GetEnvironmentVariable("CLOUDWATCH_LOG_GROUP") ?? "/eks/prod/billingservice/application";
+
+var logger = new LoggerConfiguration()
+    .Enrich.FromLogContext()
+    .Enrich.WithEnvironmentName()
+    .Enrich.WithThreadId()
+    .WriteTo.Console(new Serilog.Formatting.Json.JsonFormatter())
+    .MinimumLevel.Information()
+    .CreateLogger();
+
+Serilog.Log.Logger = logger;
+builder.Host.UseSerilog();
 
 // Configuração do JWT (chave de exemplo, troque para produção)
 var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY") ?? "chave-super-secreta-para-dev";
@@ -115,7 +133,6 @@ builder.Services.AddHealthChecks();
 // AWS Messaging Configuration (mesma estratégia do OSService)
 var awsAccessKeyId = Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID") ?? "";
 var awsSecretAccessKey = Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY") ?? "";
-var awsRegion = Environment.GetEnvironmentVariable("AWS_REGION") ?? "sa-east-1";
 var sqsQueueUrl = Environment.GetEnvironmentVariable("AWS_SQS_QUEUE_BILLING") ?? "http://localhost:4566/000000000000/billing-events";
 
 // SNS Topics Configuration (para OutboxProcessor)
@@ -172,14 +189,19 @@ builder.Services.AddDbContext<BillingDbContext>(options =>
 
 var app = builder.Build();
 
+// Log de inicialização
+var configLogger = app.Services.GetRequiredService<Serilog.ILogger>();
+configLogger.Information("🚀 BillingService iniciado. CloudWatch Log Group: {CloudWatchLogGroup}", cloudWatchLogGroup);
+
 // Log de configuração do Mercado Pago após build
-var configLogger = app.Services.GetRequiredService<ILogger<Program>>();
-configLogger.LogInformation(
+configLogger.Information(
     "🔐 Mercado Pago Configuration Loaded: IsSandbox={IsSandbox}, HasAccessToken={HasAccessToken}, UseRealService={UseReal}",
     mpIsSandbox,
     !string.IsNullOrEmpty(mpAccessToken),
     !string.IsNullOrEmpty(mpAccessToken) ? "SIM (MercadoPagoService)" : "NÃO (MercadoPagoMockService)"
 );
+
+configLogger.Information("AWS Region: {AwsRegion}, Queue: {QueueUrl}", awsRegion, sqsQueueUrl);
 
 if (app.Environment.IsDevelopment())
 {
@@ -187,8 +209,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// Middleware de CorrelationId (deve estar antes de ExceptionHandlingMiddleware)
+app.UseMiddleware<CorrelationIdMiddleware>();
+
 // Middleware global de tratamento de exceções
-app.UseMiddleware<OFICINACARDOZO.BILLINGSERVICE.API.ExceptionHandlingMiddleware>();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseHttpsRedirection();
 app.UseAuthentication();

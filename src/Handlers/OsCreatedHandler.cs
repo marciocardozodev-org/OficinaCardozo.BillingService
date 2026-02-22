@@ -35,7 +35,7 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
             try
             {
                 _logger.LogInformation(
-                    "Processando OsCreated para OS {OsId} com CorrelationId {CorrelationId}",
+                    "🎉 BillingService consumiu evento OsCreated. OsId: {OsId}, CorrelationId: {CorrelationId}",
                     envelope.Payload.OsId,
                     envelope.CorrelationId);
 
@@ -113,9 +113,12 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                     await _db.SaveChangesAsync();
 
                     _logger.LogInformation(
-                        "OutboxMessage criada com ID {MessageId} para evento {EventType}",
+                        "✅ BillingService gerou OutboxMessage para evento {EventType}. " +
+                        "MessageId: {MessageId}, OsId: {OsId}, CorrelationId: {CorrelationId}, Status: ProntoParaPublicar",
+                        outboxMessage.EventType,
                         outboxMessage.Id,
-                        outboxMessage.EventType);
+                        envelope.Payload.OsId,
+                        envelope.CorrelationId);
                 }
                 else
                 {
@@ -145,8 +148,10 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                 
                 _logger.LogError(
                     ex,
-                    "Erro ao processar OsCreated para OS {OsId}",
-                    envelope.Payload.OsId);
+                    "❌ Erro ao processar OsCreated. OsId: {OsId}, CorrelationId: {CorrelationId}, Erro: {ErrorMessage}",
+                    envelope.Payload.OsId,
+                    envelope.CorrelationId,
+                    ex.Message);
                 throw;  // ❌ Relança apenas para erros reais
             }
         }

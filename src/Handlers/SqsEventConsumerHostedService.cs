@@ -73,6 +73,10 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
 
         private async Task ProcessMessageAsync(Message message, CancellationToken stoppingToken)
         {
+            string? eventType = null;
+            string? correlationId = null;
+            string? causationId = null;
+
             try
             {
                 JsonDocument? document = null;
@@ -107,10 +111,6 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                 }
                 
                 // Tentar extrair attributes do SNS MessageAttributes (no envelope SNS)
-                string? eventType = null;
-                string? correlationId = null;
-                string? causationId = null;
-
                 if (root.TryGetProperty("MessageAttributes", out var attributesElement))
                 {
                     _logger.LogInformation($"→ Encontrados MessageAttributes no envelope SNS");
@@ -154,19 +154,29 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Handlers
                     return;
                 }
 
-                _logger.LogInformation($"✓ Evento extraído: Type={eventType}, CorrelationId={correlationId}");
+                _logger.LogInformation(
+                    "📥 BillingService processando evento da SQS. EventType: {EventType}, CorrelationId: {CorrelationId}, MessageId: {MessageId}, CausationId: {CausationId}",
+                    eventType, correlationId, message.MessageId, causationId);
 
                 using var scope = _serviceProvider.CreateScope();
                 var consumer = scope.ServiceProvider.GetRequiredService<IEventConsumer>();
                 await consumer.ConsumeAsync(eventType, payload, correlationId ?? string.Empty, causationId ?? string.Empty);
 
-                _logger.LogInformation($"✓ Evento {eventType} processado com sucesso");
+                _logger.LogInformation(
+                    "✅ BillingService consumiu evento com sucesso. EventType: {EventType}, CorrelationId: {CorrelationId}, MessageId: {MessageId}, Status: Processado",
+                    eventType, correlationId, message.MessageId);
 
                 await _sqs.DeleteMessageAsync(_queueUrl, message.ReceiptHandle, stoppingToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro ao processar mensagem SQS");
+                _logger.LogError(
+                    ex,
+                    "❌ Erro ao processar mensagem da SQS. EventType: {EventType}, CorrelationId: {CorrelationId}, MessageId: {MessageId}, Erro: {ErrorMessage}",
+                    eventType ?? "Desconhecido",
+                    correlationId ?? "N/A",
+                    message?.MessageId ?? "N/A",
+                    ex.Message);
             }
         }
 

@@ -14,6 +14,7 @@ using Amazon.SimpleNotificationService;
 using Amazon.Runtime;
 using Serilog;
 using Serilog.Context;
+using Serilog.Formatting.Json;
 
 // Configure AppContext for Npgsql DateTime handling
 AppContext.SetSwitch("Npgsql.DisableDateTimeInfinityConversions", true);
@@ -21,6 +22,8 @@ AppContext.SetSwitch("Npgsql.DisableDateTimeInfinityConversions", true);
 var builder = WebApplication.CreateBuilder(args);
 
 // ========== SERILOG CONFIGURATION ==========
+// Logs vão para stdout em formato JSON
+// No EKS, logs devem ser coletados por FluentBit ou CloudWatch Container Insights
 var awsRegion = Environment.GetEnvironmentVariable("AWS_REGION") ?? "sa-east-1";
 var cloudWatchLogGroup = Environment.GetEnvironmentVariable("CLOUDWATCH_LOG_GROUP") ?? "/eks/prod/billingservice/application";
 
@@ -28,7 +31,9 @@ var logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .Enrich.WithEnvironmentName()
     .Enrich.WithThreadId()
-    .WriteTo.Console(new Serilog.Formatting.Json.JsonFormatter())
+    .Enrich.WithProperty("LogGroup", cloudWatchLogGroup)
+    .Enrich.WithProperty("ServiceName", "BillingService")
+    .WriteTo.Console(new JsonFormatter())
     .MinimumLevel.Information()
     .CreateLogger();
 

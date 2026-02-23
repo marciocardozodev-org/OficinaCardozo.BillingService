@@ -1,0 +1,174 @@
+=================================================================================
+PROMPT PARA EXECUTIONSERVICE TEAM - Correção de ConfigMap
+=================================================================================
+
+SITUAÇÃO
+========
+
+Estávamos investigando por que OS 5 e OS 6 não avançavam no workflow de execução.
+O BillingService estava publicando PaymentConfirmed corretamente, mas ExecutionService
+não estava consumindo as mensagens.
+
+Descobrimos dois problemas na infraestrutura:
+
+1. ✅ RESOLVIDO (BillingService): Subscription errada em SNS
+   → payment-confirmed tinha 2 subscriptions (uma para execution-events, que foi removida)
+   
+2. ⚠️ PENDENTE (ExecutionService): ConfigMap com variável apontando para fila errada
+   → ExecutionService pode estar tentando consumir de "execution-events" em vez de 
+     "billing-events"
+
+
+PROBLEMA IDENTIFICADO
+=====================
+
+No arquivo ConfigMap do ExecutionService (deploy/k8s/aws-messaging-config.yaml),
+há uma inconsistência perigosa:
+
+```yaml
+# Linha X: Correto - aponta para billing-events
+INPUT_QUEUE: "https://sa-east-1.queue.amazonaws.com/953082827427/billing-events"
+
+# Linha Y: ❌ ERRADO - aponta para execution-events
+AWS_SQS_QUEUE_BILLING: "https://sqs.sa-east-1.amazonaws.com/953082827427/execution-events"
+```
+
+RISCO:
+------
+Se o código do ExecutionService usar `AWS_SQS_QUEUE_BILLING` como variável principal
+ou como fallback, ele estará consumindo de "execution-events" em vez de "billing-events".
+
+Isso explicaria por que PaymentConfirmed nunca foi processado:
+  OsCreated → BillingService gera PaymentConfirmed
+  PaymentConfirmed → publicado em SNS payment-confirmed
+  SNS subscription → roteia para SQS billing-events ✅
+  ExecutionService procura em → execution-events ❌ (fila errada!)
+
+
+SOLUÇÃO
+=======
+
+Vocês precisam fazer DOIS passos:
+
+PASSO 1: Corrigir o ConfigMap
+------------------------------
+
+No arquivo deploy/k8s/aws-messaging-config.yaml do ExecutionService:
+
+REMOVER OU CORRIGIR esta linha:
+```yaml
+AWS_SQS_QUEUE_BILLING: "https://sqs.sa-east-1.amazonaws.com/953082827427/execution-events"
+```
+
+SUBSTITUIR POR:
+```yaml
+AWS_SQS_QUEUE_BILLING: "https://sqs.sa-east-1.amazonaws.com/953082827427/billing-events"
+```
+
+MOTIVO:
+- `AWS_SQS_QUEUE_BILLING` deveria sempre apontar para a fila de entrada (billing-events)
+- ExecutionService CONSOME de billing-events (onde BillingService publica PaymentConfirmed)
+- ExecutionService PUBLICA em execution-events (SNS topic, não SQS queue)
+
+
+PASSO 2: Redeploy
+------------------
+
+Após corrigir o ConfigMap:
+
+```bash
+# 1. Aplicar a alteração
+kubectl apply -f deploy/k8s/aws-messaging-config.yaml
+
+# 2. Reiniciar o pod para pegar nova configuração
+kubectl rollout restart deployment/executionservice -n default
+
+# 3. Esperar pod estar ready
+kubectl get pods -n default | grep executionservice
+```
+
+
+VALIDAÇÃO PÓS-FIX
+=================
+
+Após o redeploy, vocês devem observar:
+
+1. ✅ Pods do ExecutionService iniciando e ficando READY (1/1)
+2. ✅ Logs mostrando: "Successfully configured SQS queue: $AWS_SQS_QUEUE_BILLING"
+3. ✅ Consumo ativo de mensagens em billing-events
+4. ✅ Job updates sendo publicados em execution-events (SNS)
+
+Comando para verificar:
+```bash
+# Ver logs de inicialização
+kubectl logs -n default deployment/executionservice --tail=50
+
+# Procurar por padrões de consumo
+kubectl logs -n default deployment/executionservice --since=5m | grep -i "received\|message\|billing"
+
+# Verificar status da fila
+aws sqs get-queue-attributes --region sa-east-1 \
+  --queue-url https://sqs.sa-east-1.amazonaws.com/953082827427/billing-events \
+  --attribute-names ApproximateNumberOfMessages ApproximateNumberOfMessagesDeleted
+```
+
+
+CONTEXTO ADICIONAL
+==================
+
+BillingService Status:
+- ✅ Publicando PaymentConfirmed corretamente em SNS payment-confirmed topic
+- ✅ Topic subscription está APENAS para billing-events (removemos a errada)
+- ✅ Mensagens chegando em billing-events SQS queue
+
+ExecutionService Esperado:
+- ✅ Consumir mensagens de billing-events
+- ✅ Processar PaymentConfirmed events
+- ✅ Criar/atualizar jobs
+- ✅ Publicar job status updates em SNS execution-events topic
+
+Teste em Andamento:
+- OS 5 e OS 6 estavam presos porque ExecutionService não processava PaymentConfirmed
+- Após a remoção da subscription errada no SNS, a próxima etapa é corrigir a leitura
+  da fila no ExecutionService
+
+
+DÚVIDAS?
+========
+
+Se o ConfigMap já está correto e há outro problema:
+
+1. Verificar variáveis de ambiente obtidas pelo pod:
+   kubectl exec -n default deployment/executionservice -- env | grep -i "queue\|sqs"
+
+2. Verificar logs de erro ao inicializar SQS consumer:
+   kubectl logs -n default deployment/executionservice | grep -i "exception\|error\|queue"
+
+3. Validar que IAM role do pod tem permissões para SQS:
+   - sqs:ReceiveMessage
+   - sqs:DeleteMessage
+   - sqs:ChangeMessageVisibility
+
+
+PRÓXIMOS TESTES (BillingService)
+================================
+
+Assim que vocês fizerem o fix:
+
+1. Vamos lançar uma nova OS de teste
+2. BillingService vai publicar PaymentConfirmed
+3. ExecutionService deve consumir e processar
+4. Jobs devem avançar de status
+5. OSService deve marcar como completo
+
+Vamos monitorar:
+- Consumo em billing-events (NumberOfMessagesDeleted increasing)
+- Job status updates em execution-events (SNS PublishCount increasing)
+- Logs de sucesso em ExecutionService
+
+
+=================================================================================
+Data: 22/02/2026 - 16:50 UTC
+Responsável: BillingService Investigation Team
+Status: Aguardando confirmação do ExecutionService Team
+=================================================================================

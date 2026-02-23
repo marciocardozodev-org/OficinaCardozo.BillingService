@@ -1,0 +1,197 @@
+=================================================================================
+PROMPT PARA EXECUTIONSERVICE TEAM - Verificação de SQS Consumer
+=================================================================================
+
+CONTEXTO
+========
+
+Corrigimos a configuração de ConfigMap (AWS_SQS_QUEUE_BILLING apontava para fila
+errada), e ExecutionService foi redeploy há ~15 minutos.
+
+Testamos uma nova OS (OS 7) e observamos que:
+- ✅ BillingService publicou PaymentConfirmed corretamente em SNS
+- ✅ SNS roteiou para SQS billing-events
+- ✅ billing-events recebeu a mensagem (CloudWatch: NumberOfMessagesSent=1)
+- ✅ billing-events deletou a mensagem (CloudWatch: NumberOfMessagesDeleted=1)
+- ❌ ExecutionService não criou job para OS 7 (ou não processou)
+
+DESCOBERTA IMPORTANTE
+=====================
+
+Analisando logs do pod atual do ExecutionService (desde o redeploy):
+
+Logs mostram APENAS:
+  - Inicialização do serviço
+  - Conexão com banco de dados
+  - Query periódica: SELECT ... FROM ExecutionJobs (polling a cada 5s)
+  
+Logs NÃO mostram:
+  - ReceiveMessage na SQS
+  - Consumo de billing-events
+  - Processamento de PaymentConfirmed
+  - Nenhum padrão de SQS consumer ativo
+
+
+PERGUNTA CRÍTICA
+================
+
+O ExecutionService TEM UM SQS CONSUMER IMPLEMENTADO?
+
+Especificamente:
+1. ✅ Há algum HostedService ou BackgroundService que consome billing-events?
+2. ✅ Há algum SqsEventConsumer ou PaymentConfirmedHandler?
+3. ✅ Como PaymentConfirmed chega até ExecutionService?
+   - Via SQS? (esperado, baseado na arquitetura)
+   - Via API REST?
+   - Via Banco de dados (trigger)?
+   - Via outro mecanismo?
+
+4. ✅ Se há SQS consumer, por que NÃO aparecem nos logs?
+   - Logs estão sendo filtrados?
+   - Consumer não foi inicializado?
+   - Consumer está em erro silencioso?
+
+
+ESTRUTURA ESPERADA (para referência)
+====================================
+
+Com base em como BillingService implementou, esperamos que ExecutionService tenha:
+
+```csharp
+// 1. HostedService que inicia na aplicação
+public class SqsEventConsumerHostedService : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var messages = await _sqs.ReceiveMessageAsync(
+                queueUrl: Environment.GetEnvironmentVariable("AWS_SQS_QUEUE_BILLING"),
+                maxMessages: 10,
+                waitTimeSeconds: 5
+            );
+            
+            foreach (var message in messages)
+            {
+                // Parse e route para handler correto
+                var eventType = ExtractEventType(message);
+                
+                if (eventType == "PaymentConfirmed")
+                    await _paymentConfirmedHandler.HandleAsync(message);
+                
+                // Delete da fila
+                await _sqs.DeleteMessageAsync(message);
+            }
+        }
+    }
+}
+
+// 2. Handler específico
+public class PaymentConfirmedHandler
+{
+    public async Task HandleAsync(Message message)
+    {
+        var payment = JsonSerializer.Deserialize<PaymentConfirmed>(message.Body);
+        
+        // Cria job de execução
+        var job = new ExecutionJob { OsId = payment.OsId, Status = "Queued" };
+        await _db.ExecutionJobs.AddAsync(job);
+        await _db.SaveChangesAsync();
+        
+        // Executa ações (diagnósticos, reparação, etc)
+        var result = await ExecuteAsync(job);
+        
+        // Publica ExecutionFinished
+        await _publisher.PublishAsync(new ExecutionFinished { ... });
+    }
+}
+```
+
+Se ExecutionService NÃO tem isso implementado, é aí que está o problema!
+
+
+DADOS DO TESTE
+==============
+
+OS ID: 7
+GUID da OS: 00000000-0000-0000-0000-000000000007
+Timestamp PublishMessage (SNS): 2026-02-22T16:XX:XXZ
+Status esperado: ExecutionService deveria ter criado job e publicado ExecutionFinished
+
+
+CHECKLIST PARA EXECUTIONSERVICE
+================================
+
+[ ] 1. Confirmar se SqsEventConsumer está implementado e ativado
+[ ] 2. Confirmar que está registrado no DI Container (Program.cs)
+[ ] 3. Confirmar logs verbose/debug para ReceiveMessage
+[ ] 4. Confirmar que IAM role tem permissões:
+      - sqs:ReceiveMessage
+      - sqs:DeleteMessage
+      - sqs:ChangeMessageVisibility
+[ ] 5. Verificar se há erros silenciosos (try/catch sem logs)
+[ ] 6. Verificar banco de dados: há job para OsId 7?
+      SELECT * FROM execution_jobs WHERE os_id = '00000000-0000-0000-0000-000000000007'
+
+
+INVESTIGAÇÃO SUGERIDA
+=====================
+
+1. Verificar Program.cs/Startup:
+   ✅ services.AddHostedService<SqsEventConsumerHostedService>()
+   ✅ services.AddSingleton<IAmazonSQS>(...)
+   ✅ Credenciais AWS sendo injetadas
+
+2. Verificar PaymentConfirmedHandler:
+   ✅ Existe?
+   ✅ Está sendo chamado?
+   ✅ Tem lógica para criar ExecutionJob?
+
+3. Verificar logs em tempo real:
+   ```bash
+   kubectl logs -n default deployment/executionservice -f --tail=100
+   ```
+   Procurar por: "ReceiveMessage", "PaymentConfirmed", "ExecutionJob"
+
+4. Se ainda sem sucesso, aumentar log level:
+   ```bash
+   # Ver env vars do pod
+   kubectl exec -n default deployment/executionservice -- env | grep -i "log\|debug"
+   
+   # Se houver LOG_LEVEL, tentar mudar para Debug/Verbose via ConfigMap
+   ```
+
+
+PRÓXIMOS PASSOS
+===============
+
+Após confirmação:
+
+A. SE há SQS Consumer implementado:
+   ✅ Aumentar logs
+   ✅ Diagnosticar por que não processa
+   ✅ Redeploy se necessário
+
+B. SE NÃO há SQS Consumer implementado:
+   ⚠️ CRÍTICO - ExecutionService não pode consumir PaymentConfirmed!
+   🛠️ Implementar SqsEventConsumer + PaymentConfirmedHandler
+   🛠️ Registrar como HostedService
+   🛠️ Deploy novo build
+
+
+BLOQUADOR CONHECIDO
+===================
+
+Se a resposta for "ExecutionService ainda não tem SQS Consumer implementado",
+isso explica tudo:
+- PaymentConfirmed é publicado ✅
+- Mas ninguém no ExecutionService está escutando ❌
+- Mensagem é deletada por timeout de visibilidade (~60s)
+- Workflow inteiro fica bloqueado
+
+
+=================================================================================
+Data: 22/02/2026 - 17:00 UTC
+OS Teste: 7 (00000000-0000-0000-0000-000000000007)
+Status: Aguardando confirmação de implementação SQS Consumer
+=================================================================================

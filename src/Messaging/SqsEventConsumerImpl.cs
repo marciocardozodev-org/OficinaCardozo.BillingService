@@ -24,6 +24,9 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
         {
             try
             {
+                // ⚠️ BillingService APENAS processa OsCreated
+                // PaymentConfirmed, ExecutionFinished, etc. são ignoradas neste serviço
+                // Elas deverão ser consumidas por seus respectivos consumers (ExecutionService, OSService, etc.)
                 if (eventType == nameof(OsCreated))
                 {
                     using var document = JsonDocument.Parse(payload);
@@ -61,6 +64,14 @@ namespace OFICINACARDOZO.BILLINGSERVICE.Messaging
                     };
 
                     await _osCreatedHandler.HandleAsync(envelope);
+                }
+                else
+                {
+                    // ⚠️ Evento não é OsCreated - não deve ser processado por BillingService
+                    // Isso indica erro de configuração de SNS/SQS subscriptions
+                    Console.WriteLine($"⚠️ BillingService recebeu evento '{eventType}' que não deve processar. " +
+                        $"Verifique se filas e subscriptions de SNS estão configuradas corretamente. " +
+                        $"PaymentConfirmed deve ir para execution-events, não billing-events.");
                 }
             }
             catch (Exception ex)

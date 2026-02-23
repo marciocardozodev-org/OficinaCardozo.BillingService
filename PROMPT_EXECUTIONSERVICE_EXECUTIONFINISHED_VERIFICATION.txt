@@ -1,0 +1,286 @@
+=================================================================================
+PROMPT PARA EXECUTIONSERVICE TEAM - Verificação de ExecutionFinished
+=================================================================================
+
+SITUAÇÃO ATUAL
+==============
+
+Estamos investigando por que o fluxo E2E não completa. BillingService já está
+publicando PaymentConfirmed corretamente em SNS, e execution-events está limpa
+(ou recebe PaymentConfirmed). MAS OSService não consegue finalizar a OS porque
+não recebe ExecutionFinished.
+
+Acabamos de fazer 2 descobertas importantes:
+
+
+DISCOVERING #1: Subscription Errada de execution-finished
+=========================================================
+
+PROBLEMA:
+  execution-finished estava sendo routeado para BILLING-EVENTS
+  (fila errada! OSService não consegue receber lá)
+
+❌ ANTES:
+  SNS execution-finished → SQS billing-events
+
+✅ CORRIGIDO (já feito):
+  SNS execution-finished → SQS os-events ✓
+
+Isso significa agora ExecutionFinished TEM que chegar em OSService, desde que
+ExecutionService publique corretamente.
+
+
+DISCOVERING #2: ExecutionService Pode Não Estar Publicando ExecutionFinished
+===========================================================================
+
+Analisando logs recentes de ExecutionService (últimos 30 min):
+
+❌ NÃO encontramos evidência de:
+   - Consumo de PaymentConfirmed ("PaymentConfirmed received")
+   - Criação de ExecutionJob ("Job created" ou "Handling PaymentConfirmed")
+   - Publicação de ExecutionFinished ("ExecutionFinished published")
+
+✅ Encontramos APENAS:
+   - Polling de OutboxEvents a cada 5s (SELECT ... WHERE NOT Published)
+   - Polling de ExecutionJobs a cada 5s (SELECT ... WHERE Status IN (...))
+   - Health checks
+
+PERGUNTA CRÍTICA:
+  Quando um PaymentConfirmed é recebido, ExecutionService:
+  
+  1. Está consumindo de billing-events?
+     ├─ Sim → SqsEventConsumer deve estar funcionando
+     └─ Não → Qual mecanismo recebe PaymentConfirmed?
+  
+  2. Está criando um ExecutionJob?
+     └─ Se sim, deveria haver log de DB INSERT
+  
+  3. Está executando as ações (diagnóstico, reparo)?
+     └─ Esperamos ver UPDATE ExecutionJobs (status = "Executing", etc)
+  
+  4. Está publicando ExecutionFinished?
+     ├─ Via SNS (direto ou Outbox?)
+     └─ CRÍTICO: Sem isso, OSService nunca finaliza
+
+
+CHECKLIST DE VERIFICAÇÃO
+=========================
+
+[ ] 1. Confirmar que PaymentConfirmed foi consumido
+   ```bash
+   kubectl logs -n default deployment/executionservice --since=30m \
+     | grep -i "PaymentConfirmed\|received.*message\|handling.*payment"
+   ```
+   Esperamos ver algo como:
+   "Processing PaymentConfirmed for OsId: 5"
+   "Handling message: EventType=PaymentConfirmed"
+
+[ ] 2. Confirmar que ExecutionJob foi criado
+   ```bash
+   # Conectar ao banco de ExecutionService
+   psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -c \
+     "SELECT os_id, status, created_at FROM execution_jobs \
+      WHERE os_id = '00000000-0000-0000-0000-000000000007' \
+      ORDER BY created_at DESC LIMIT 5;"
+   ```
+   Esperamos ver:
+   - Row com OsId = 00000000-0000-0000-0000-000000000007
+   - Status = "Queued" ou "Executing" ou "Completed"
+
+[ ] 3. Confirmar que OutboxEvents tem ExecutionFinished criado
+   ```bash
+   psql -h $POSTGRES_HOST -U $POSTGRES_USER -d $POSTGRES_DB -c \
+     "SELECT id, event_type, correlation_id, published, created_at \
+      FROM outbox_events \
+      WHERE event_type = 'ExecutionFinished' \
+      ORDER BY created_at DESC LIMIT 3;"
+   ```
+   Esperamos ver:
+   - Rows com EventType = ExecutionFinished
+   - Published = false ou true (dependendo se OutboxProcessor rodou)
+
+[ ] 4. Adicionar logs verbosos no handler de PaymentConfirmed
+   ```csharp
+   public class PaymentConfirmedHandler
+   {
+       public async Task HandleAsync(PaymentConfirmed payment)
+       {
+           logger.LogInformation("🔵 Handling PaymentConfirmed: OsId={OsId}", payment.OsId);
+           
+           var job = new ExecutionJob { OsId = payment.OsId, Status = "Queued" };
+           _db.ExecutionJobs.Add(job);
+           await _db.SaveChangesAsync();
+           
+           logger.LogInformation("✅ ExecutionJob created: ItemId={JobId}, OsId={OsId}", 
+               job.Id, payment.OsId);
+           
+           // Execute e publicar ExecutionFinished
+           var result = await ExecuteAsync(job);
+           
+           var executionFinished = new ExecutionFinished { ... };
+           await _publisher.PublishAsync(executionFinished);
+           
+           logger.LogInformation("📤 ExecutionFinished published: OsId={OsId}", payment.OsId);
+       }
+   }
+   ```
+
+[ ] 5. Aumentar log level do OutboxProcessor
+   ```csharp
+   logger.LogInformation("📬 OutboxProcessor: Found {Count} unpublished events", 
+       unpublishedEvents.Count);
+   
+   foreach (var @event in unpublishedEvents)
+   {
+       logger.LogInformation("📤 Publishing event: Type={Type}, CorrelationId={CorrelationId}", 
+           @event.EventType, @event.CorrelationId);
+       
+       // Publicar...
+       
+       logger.LogInformation("✅ Event published: Type={Type}, CorrelationId={CorrelationId}", 
+           @event.EventType, @event.CorrelationId);
+   }
+   ```
+
+
+TESTE PRÁTICO
+=============
+
+Quando tiverem logs adicionados:
+
+1. BillingService publica PaymentConfirmed para OS 8
+2. Monitorar execution-events:
+   ```bash
+   watch -n 1 "aws sqs get-queue-attributes --region sa-east-1 \
+     --queue-url https://sqs.sa-east-1.amazonaws.com/953082827427/execution-events \
+     --attribute-names ApproximateNumberOfMessages"
+   ```
+   Esperamos: 0 (ExecutionService consome)
+
+3. Verificar logs de ExecutionService em tempo real:
+   ```bash
+   kubectl logs -n default deployment/executionservice -f --tail=50
+   ```
+   Esperamos ver:
+   - "🔵 Handling PaymentConfirmed: OsId=..."
+   - "✅ ExecutionJob created: ..."
+   - "📤 ExecutionFinished published: OsId=..."
+
+4. Verificar que ExecutionFinished chegou em os-events:
+   ```bash
+   aws sqs receive-message --region sa-east-1 \
+     --queue-url https://sqs.sa-east-1.amazonaws.com/953082827427/os-events \
+     --max-number-of-messages 3 | jq '.Messages[].Body'
+   ```
+   Esperamos ver: EventType=ExecutionFinished com OsId correto
+
+5. Verificar que OSService finalizou a OS
+   ```bash
+   # Endpoint de OSService (depende da arquitetura deles)
+   curl http://osservice:8080/api/os/00000000-0000-0000-0000-000000000008
+   ```
+   Esperamos: status = "Finished" ou "Completed"
+
+
+CONTEXTO COMPLETO DOS FIXES
+============================
+
+BEFORE (Estado com bugs):
+┌─────────────────────────────────────────────────────────────┐
+│ OsService lança OS 5                                        │
+├─────────────────────────────────────────────────────────────┤
+│  ↓ (OsCreated)                                              │
+│ SNS os-created                                              │
+│  ├─> SQS billing-events                                    │
+│  │    └─ BillingService consome ✓                          │
+│  │       ├─ Processa MercadoPago ✓                         │
+│  │       └─ PaymentConfirmed → SNS payment-confirmed ✓    │
+│  │  ↓                                                       │
+│  │ SNS payment-confirmed                                   │
+│  │  ├─> SQS billing-events ❌ (ERRO #1)                   │
+│  │  │    └─ BillingService recebe e DELETA (sem processar)
+│  │  │       (Não deveria receber PaymentConfirmed aqui!)  │
+│  │  │                                                      │
+│  │  └─> SQS execution-events (ainda com ERRO #2)          │
+│  │       └─ ExecutionService poderia receber, MAS...       │
+│  │          └─ Pode não estar publicando ExecutionFinished │
+│  │                                                          │
+│  └─> SNS execution-finished                                │
+│       └─> SQS billing-events ❌ (ERRO #3)                 │
+│           └─ OSService nunca recebe! OS fica aberta ❌   │
+└─────────────────────────────────────────────────────────────┘
+
+STATUS APÓS FIX #1 (removida subscription errada):
+┌─────────────────────────────────────────────────────────────┐
+│ OsService lança OS 6                                        │
+├─────────────────────────────────────────────────────────────┤
+│  ↓ (OsCreated)                                              │
+│ SNS os-created                                              │
+│  ├─> SQS billing-events                                    │
+│  │    └─ BillingService consome ✓                          │
+│  │       └─ PaymentConfirmed → SNS payment-confirmed ✓    │
+│  │  ↓                                                       │
+│  │ SNS payment-confirmed                                   │
+│  │  └─> SQS execution-events ✓ (FIX #1)                   │
+│  │       └─ ExecutionService recebe... MAS?                │
+│  │          ├─ Processa? (desconhecido - veja DISCOVERING #2)
+│  │          └─ Publica ExecutionFinished?                 │
+│  │             ↓                                            │
+│  │             SNS execution-finished                       │
+│  │              └─> SQS os-events ✓ (FIX #2 - NOVO)       │
+│  │                   └─ OSService recebe ✓                │
+│  │                      └─ Mark OS as Finished ✓          │
+│  │                                                          │
+│  └─> SNS budget-approved (outros eventos)                  │
+│       └─ SQS ... (outros destinos)                         │
+└─────────────────────────────────────────────────────────────┘
+
+STATUS ESPERADO APÓS VOCÊS CONFIRMAREM:
+✅ PaymentConfirmed está sendo processado
+✅ ExecutionJob está sendo criado
+✅ ExecutionFinished está sendo publicado
+
+
+RESUMO DO QUE JÁ CORRIGIMOS
+===========================
+
+Fix #1 (Payment-Confirmed): ✅ FEITO
+  ❌ payment-confirmed → billing-events (REMOVIDA)
+  ✅ payment-confirmed → execution-events (MANTIDA)
+
+Fix #2 (Execution-Finished): ✅ FEITO
+  ❌ execution-finished → billing-events (REMOVIDA)
+  ✅ execution-finished → os-events (RECRIADA)
+
+Fix #3 (BillingService):  ✅ FEITO
+  └─ Código atualizado para ignorar eventos que não são OsCreated
+     com log de aviso se receber tipo errado
+
+
+O QUE FALTA (TO-DO do ExecutionService):
+=========================================
+
+[ ] Verificar se PaymentConfirmed está sendo consumido
+[ ] Adicionar logs verbosos (veja CHECKLIST acima)
+[ ] Confirmar que ExecutionJob está sendo criado no banco
+[ ] Confirmar que ExecutionFinished está na OutboxEvents
+[ ] Publicar ExecutionFinished ou deixar OutboxProcessor fazer
+[ ] Testar fluxo E2E com nova OS
+[ ] Validar que OSService recebe mensagem e finaliza OS
+
+
+DÚVIDAS?
+========
+
+Se encontrarem algo diferente do esperado, compartilhem:
+1. Logs do handler de PaymentConfirmed (com timestamps)
+2. Estado do banco (ExecutionJobs, OutboxEvents)
+3. Métrica SNS de execution-finished (NumberOfMessagesPublished)
+4. Qualquer erro ou exceção nos logs
+
+
+=================================================================================
+Data: 22/02/2026 - 17:50 UTC
+Status: Aguardando confirmação de que ExecutionFinished está sendo publicado
+Próximo Passo: Teste E2E após implantação de logs verbosos
+=================================================================================

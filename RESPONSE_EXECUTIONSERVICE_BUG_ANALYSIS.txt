@@ -1,0 +1,246 @@
+=================================================================================
+RESPOSTA BILLINGSERVICE - Bug de SNS Subscription Confirmado
+=================================================================================
+
+EXECUÇÃO
+========
+
+Vocês estão **100% CORRETOS**. Identificamos a raiz do problema:
+
+BillingService **está deletando PaymentConfirmed** que nunca deveria processar.
+
+
+ANÁLISE DO BUG
+==============
+
+No arquivo SqsEventConsumerImpl.cs:
+
+```csharp
+public async Task ConsumeAsync(string eventType, string payload, ...)
+{
+    if (eventType == nameof(OsCreated))  
+    {
+        // ✅ Processa OsCreated (evento esperado)
+        await _osCreatedHandler.HandleAsync(envelope);
+    }
+    // ❌ SE eventType == "PaymentConfirmed":
+    //    - NÃO entra no if
+    //    - NÃO processa nada
+    //    - MAS a mensagem é deletada mesmo assim!
+}
+```
+
+**O fluxo errado que estava acontecendo:**
+
+1. OsService publica OsCreated
+   ↓
+2. SNS os-created → SQS billing-events
+   ↓
+3. BillingService consome OsCreated ✅
+   └─ Cria orçamento
+   └─ Publica PaymentConfirmed em SNS payment-confirmed
+   ↓
+4. SNS payment-confirmed → SQS billing-events (SUBSCRIPTION ERRADA!)
+   ↓
+5. BillingService consome de billing-events
+   ├─ Recebe PaymentConfirmed
+   ├─ Checa: "é OsCreated?" → NÃO
+   ├─ Ignora completamente
+   └─ **DELETA a mensagem!** ❌
+   ↓
+6. ExecutionService esperando, mas mensagem já foi deletada
+   └─ Resultado: OS 5, 6, 7 bloqueadas
+
+
+RESPONSABILIDADE DE BILLINGSERVICE
+===================================
+
+BillingService DEVE fazer:
+  ✅ Consumir OsCreated de billing-events
+  ✅ Processar com MercadoPago
+  ✅ Publicar PaymentConfirmed em SNS payment-confirmed
+  
+BillingService NÃO DEVE fazer:
+  ❌ Consumir PaymentConfirmed que ele mesmo publica
+  ❌ Rotar PaymentConfirmed de volta para billing-events
+
+
+SOLUÇÃO
+=======
+
+Há 2 opções. Recomendamos a OPÇÃO 1:
+
+OPÇÃO 1: Remover a Subscription Errada (PREFERIDO)
+---------------------------------------------------
+
+A subscription de `payment-confirmed` → `billing-events` NUNCA deveria existir!
+
+Remover:
+```bash
+aws sns unsubscribe --region sa-east-1 \
+  --subscription-arn "arn:aws:sns:sa-east-1:953082827427:payment-confirmed:8058c497-e67a-4a68-89ab-cf76dc6f1fb0"
+```
+
+Status atual (ERRADO):
+  ├─ payment-confirmed → billing-events ❌
+  └─ payment-confirmed → execution-events ✅
+
+Status desejado:
+  └─ payment-confirmed → execution-events ✅ (APENAS!)
+
+❌ NÃO deve haver: payment-confirmed → billing-events
+
+
+OPÇÃO 2: Desabilitar SQS Consumer (Workaround, não definitivo)
+--------------------------------------------------------------
+
+Se não conseguir remover a subscription por limitações, poderíamos:
+- Desabilitar SqsEventConsumerHostedService em BillingService
+- Receber PaymentConfirmed apenas via MercadoPago webhook (já funciona)
+
+MAS isso não é ideal porque deixa a infraestrutura confusa.
+
+
+ARQUITETURA CORRETA
+===================
+
+┌─ OSService ─────┐
+│ Publica:        │
+│ - OsCreated     │
+└────┬────────────┘
+     │
+     ├─→ SNS os-created
+     │   └─→ SQS billing-events ──→ BillingService consome ✅
+     │
+     └─→ SNS budget-approved (feedback)
+
+
+┌─ BillingService ┐
+│ Consome:        │
+│ - OsCreated     │
+│ Publica:        │
+│ - PaymentConfirmed
+└────┬────────────┘
+     │
+     └─→ SNS payment-confirmed
+         └─→ SQS execution-events ──→ ExecutionService consome ✅
+                                       NOT billing-events ❌
+
+
+┌─ ExecutionService ──────┐
+│ Consome:                │
+│ - PaymentConfirmed      │
+│ Publica:                │
+│ - ExecutionFinished     │
+└────┬───────────────────┘
+     │
+     └─→ SNS execution-events
+         └─→ SQS os-events ──→ OSService consome ✅
+
+
+CONFIRMAÇÃO DE CORREÇÃO
+=======================
+
+Após remover a subscription errada:
+
+[ ] 1. Verificar:
+    ```bash
+    aws sns list-subscriptions-by-topic --region sa-east-1 \
+      --topic-arn arn:aws:sns:sa-east-1:953082827427:payment-confirmed
+    ```
+    Resultado deve ser:
+    - APENAS 1 subscription: payment-confirmed → execution-events
+    - Nenhuma para billing-events
+
+[ ] 2. Lançar novo teste OS
+    - BillingService publica PaymentConfirmed
+    - ExecutionService recebe e processa
+    - Workflow completa até o final
+
+
+CÓDIGO ATUALIZADO
+=================
+
+Atualizamos SqsEventConsumerImpl.cs para deixar claro qual é o propósito:
+
+```csharp
+// ⚠️ BillingService APENAS processa OsCreated
+// PaymentConfirmed, ExecutionFinished, etc. são ignoradas neste serviço
+// Elas deverão ser consumidas por seus respectivos consumers
+if (eventType == nameof(OsCreated))
+{
+    // Processa...
+}
+else
+{
+    Console.WriteLine($"⚠️ BillingService recebeu evento '{eventType}' que não deve processar. " +
+        $"Verifique se filas e subscriptions de SNS estão configuradas corretamente.");
+}
+```
+
+Agora quando PaymentConfirmed chegar, há log alertando sobre erro de configuração.
+
+
+STATUS TIMELINE
+===============
+
+16:16Z    - OS 5 original: Mensagem foi deletada sem consumo
+16:39Z    - OS 5 replay: Consumido com sucesso por BillingService
+16:42Z    - PaymentConfirmed publicado, mas acumulou porque...
+          - ExecutionService não estava consumindo (subscription apontava para execution-events vazia)
+
+Agora descoberto:
+17:13Z    - OS 7 teste: BillingService deletou PaymentConfirmed que era pra ExecutionService
+
+
+PRÓXIMOS PASSOS
+===============
+
+1. ✅ BillingService: Código atualizado com comentários (FEITO)
+2. 🔄 BillingService/Cloud: Remover a subscription errada:
+   ```bash
+   aws sns unsubscribe --region sa-east-1 \
+     --subscription-arn "arn:aws:sns:sa-east-1:953082827427:payment-confirmed:8058c497-e67a-4a68-89ab-cf76dc6f1fb0"
+   ```
+3. 🔄 Validar:
+   ```bash
+   aws sns list-subscriptions-by-topic --region sa-east-1 \
+     --topic-arn arn:aws:sns:sa-east-1:953082827427:payment-confirmed
+   ```
+4. 🔄 Teste completo com nova OS
+5. ✅ ExecutionService continua com seu SQS Consumer (está certo)
+
+
+LIÇÃO APRENDIDA
+===============
+
+BillingService está correto na implementação, mas a configuração de SNS/SQS 
+tinha um erro de roteamento:
+
+❌ payment-confirmed publicava para DUAS filas:
+   - billing-events (errado!)
+   - execution-events (certo!)
+
+✅ depois de remover a subscription errada:
+   - payment-confirmed publica APENAS para execution-events
+
+
+QUESTÃO RESOLVIDA
+=================
+
+Vocês perguntaram: "BillingService está deletando mensagens PaymentConfirmed.
+Qual é a responsabilidade? Podemos desabilitar?"
+
+Resposta: 
+- Responsabilidade: APENAS OsCreated
+- Desabilitar: Não precisa (já ignora PaymentConfirmed)
+- Solução: Remover a subscription errada de SNS
+
+A infraestrutura estava configurada errado, não o código.
+
+
+=================================================================================
+Data: 22/02/2026 - 17:30 UTC
+Status: ✅ Bug Identificado e Solução Proposta
+Próximo Passo: Remover subscription errada e testar
+=================================================================================

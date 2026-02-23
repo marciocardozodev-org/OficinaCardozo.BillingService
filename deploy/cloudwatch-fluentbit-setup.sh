@@ -40,7 +40,7 @@ data:
     [INPUT]
         Name                tail
         Path                /var/log/containers/*.log
-        Parser              docker
+        Parser              cri
         Tag                 kube.*
         Refresh_Interval    5
         Mem_Buf_Limit       50MB
@@ -59,8 +59,8 @@ data:
         Name                cloudwatch
         Match               kube.*
         region              ${AWS_REGION}
-        log_group_name      /eks/prod/\${kubernetes['namespace_name']}/\${kubernetes['pod_name']}
-        log_stream_prefix   \${kubernetes['pod_name']}-
+        log_group_name      /eks/prod/billingservice/application
+        log_stream_prefix   billingservice-
         auto_create_group   true
         log_retention_days  30
 
@@ -70,6 +70,14 @@ data:
         Format              json
         Time_Key            time
         Time_Format         %Y-%m-%dT%H:%M:%S.%LZ
+        Time_Keep           On
+
+    [PARSER]
+        Name                cri
+        Format              regex
+        Regex               ^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<logtag>[^ ]*) (?<log>.*)$
+        Time_Key            time
+        Time_Format         %Y-%m-%dT%H:%M:%S.%L%z
         Time_Keep           On
 
     [PARSER]
